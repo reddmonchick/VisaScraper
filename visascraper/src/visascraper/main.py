@@ -19,7 +19,7 @@ def extract_status(html_content: str) -> str:
         return ''
     try:
         soup = BeautifulSoup(html_content, 'lxml')
-        status_span = soup.find('span', class_='badge bg-success')
+        status_span = soup.find('span')
         return status_span.text.strip() if status_span else ''
     except Exception as e:
         print(f"Error extracting status: {e}")
@@ -277,6 +277,8 @@ while True:
     password_account = worksheet_account.col_values(2)
     worksheet = spreadsheet.worksheet('Batch Application')
     worksheet.clear()
+    worksheet_manager = spreadsheet.worksheet('Batch Application(Manager)')
+    worksheet_manager.clear()
     headers = ["Batch No", "Register Number", "Full Name", "Visitor Visa Number", "Passport Number", "Payment Date", "Visa Type", "Status", "Action Link"]
     worksheet.append_row(headers)
     for index, name in enumerate(name_account, 0):
@@ -400,7 +402,10 @@ while True:
                 visa_type = res.get('visa_type', '')
                 status = res.get('status', '').split('badge bg-success">')[-1].split('</span>')[0].split('">')[-1]
                 action = res.get('actions', '').split('href="')[-1].split('" ')[0]
-                action_link = f"https://evisa.imigrasi.go.id{action}"
+                if not action.split('/')[-1] != 'print':
+                    action_link = ''
+                else:
+                    action_link = f"https://evisa.imigrasi.go.id{action}"
                 client_data.append([batch_no,
                                     register_number,
                                     full_name,
@@ -423,7 +428,7 @@ while True:
     password_account = worksheet_account.col_values(2)
     worksheet = spreadsheet.worksheet('StayPermit')
     worksheet.clear()
-    headers_new = ["Register Number", "Name", "Permit Number","Type of Stypermit", "Visistor visa number", "Visa type", "Passport number", "Arrival date", "Issue date", "Expired data", "Status", "Action"]
+    headers_new = ["Name", "Type of Stypermit", "Visa type",  "Arrival date", "Issue date", "Expired data", "Status", "Account"]
     worksheet.append_row(headers_new)
 
     for index, name in enumerate(name_account, 0):
@@ -560,23 +565,18 @@ while True:
                     issue_data = safe_get(res, 'issue_date')
                     expired_data = safe_get(res, 'expired_date')
 
-                    # Извлечение статуса и действия
+                    # Извлечение статуса
                     status = extract_status(safe_get(res, 'status'))
-                    action_result = extract_action_link(safe_get(res, 'action'))
 
                     client_data.append([
-                        reg_number,
                         full_name,
-                        permit_number,
                         type_permit,
-                        visa_number,
                         type_visa,
-                        passport_number,
                         start_date,
                         issue_data,
                         expired_data,
                         status,
-                        action_result
+                        name
                     ])
 
                     #Debugging
