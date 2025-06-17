@@ -43,12 +43,37 @@ def extract_action_link(html_content: str) -> str:
 
 def extract_reg_number(html_content: str) -> str:
     """Извлекает номер регистрации"""
+    if not html_content:
+        return ''
     try:
         reg_number = BeautifulSoup(html_content, 'lxml')
         number = reg_number.find('a').text
         return number
     except:
         return html_content
+    
+def extract_visa(html_content: str) -> str:
+    """Извлекает ссылку на пдф визы"""
+    if not html_content:
+        return ''
+    try:
+        action_link = BeautifulSoup(html_content, 'lxml')
+        link = action_link.find('a', class_='fw-bold btn btn-sm btn-outline-info btn-back')['href']
+        return link
+    except:
+        return ''
+    
+def extract_status_batch(html_content: str) -> str:
+    """Извлекает текст статуса из HTML-контента."""
+    if not html_content:
+        return ''
+    try:
+        soup = BeautifulSoup(html_content, 'lxml')
+        status_span = soup.find('span')
+        return status_span.text.strip() if status_span else ''
+    except Exception as e:
+        print(f"Error extracting status: {e}")
+        return ''
 
 def save_value(name, value):
     with open("src/data.json", "w") as f:
@@ -275,12 +300,20 @@ while True:
     worksheet_account = spreadsheet.worksheet('Аккаунты')
     name_account = worksheet_account.col_values(1)
     password_account = worksheet_account.col_values(2)
-    worksheet = spreadsheet.worksheet('Batch Application')
+    try:
+        worksheet = spreadsheet.worksheet('Batch Application')
+    except:
+        worksheet = spreadsheet.add_worksheet('Batch Application')
     worksheet.clear()
-    worksheet_manager = spreadsheet.worksheet('Batch Application(Manager)')
+    try:
+        worksheet_manager = spreadsheet.worksheet('Batch Application(Manager)')
+    except:
+        worksheet_manager = spreadsheet.add_worksheet('Batch Application(Manager)', rows=100, cols=100)
     worksheet_manager.clear()
-    headers = ["Batch No", "Register Number", "Full Name", "Visitor Visa Number", "Passport Number", "Payment Date", "Visa Type", "Status", "Action Link"]
+    headers = ["Batch No", "Register Number", "Full Name", "Visitor Visa Number", "Passport Number", "Payment Date", "Visa Type", "Status", "Action Link", "Account"]
+    headers_manager = ["Full Name", 'Visa Type', 'Payment Date', 'Status', 'Action Link']
     worksheet.append_row(headers)
+    worksheet_manager.append_row(headers_manager)
     for index, name in enumerate(name_account, 0):
         print(name)
         session_id = load_value(name)
@@ -309,6 +342,7 @@ while True:
         }
 
         client_data = []
+        manager_data = []
         offset = 0
 
         while True:
@@ -393,19 +427,20 @@ while True:
             print('Запрос на получении Batch Application', response)
             result = response.json().get('data', [])
             for res in result:
-                batch_no = res.get('header_code', '').strip().replace('\n', '')
-                register_number = res.get('register_number', '')
-                full_name = res.get('full_name', '')
-                visitor_visa_number = res.get('request_code', '')
-                passport_number = res.get('passport_number')
-                payment_date = res.get('paid_date', '')
-                visa_type = res.get('visa_type', '')
-                status = res.get('status', '').split('badge bg-success">')[-1].split('</span>')[0].split('">')[-1]
-                action = res.get('actions', '').split('href="')[-1].split('" ')[0]
-                if not action.split('/')[-1] != 'print':
+                batch_no = safe_get(res, 'header_code').strip().replace('\n', '')
+                register_number = safe_get(res,'register_number')
+                full_name = safe_get(res, 'full_name')
+                visitor_visa_number = safe_get(res, 'request_code')
+                passport_number = safe_get(res, 'passport_number')
+                payment_date = safe_get(res, 'paid_date')
+                visa_type = safe_get(res,'visa_type')
+                status = extract_status_batch(safe_get(res, 'status'))
+                action = extract_visa(safe_get(res, 'actions'))
+                if not action.split('/')[-1] == 'print':
                     action_link = ''
                 else:
                     action_link = f"https://evisa.imigrasi.go.id{action}"
+
                 client_data.append([batch_no,
                                     register_number,
                                     full_name,
@@ -414,13 +449,20 @@ while True:
                                     payment_date,
                                     visa_type,
                                     status,
-                                    action_link])
+                                    action_link,
+                                    name])
+                manager_data.append([full_name,
+                                     visa_type,
+                                     payment_date,
+                                     status,
+                                     action_link])
 
             offset += 850
             if not result:
                 break
         print(f'Заполняем гугл таблицу Batch Application по данным из аккаунта {name} ')
         worksheet.append_rows(client_data)
+        worksheet_manager.append_rows(manager_data)
 
     spreadsheet = gc.open_by_key("1tzSQbkOYFAzv8T0d_pLG8ZlHo27Le6CyC2GDJbLFTm4")  # ID таблицы из URL
     worksheet_account = spreadsheet.worksheet('Аккаунты')
@@ -428,7 +470,7 @@ while True:
     password_account = worksheet_account.col_values(2)
     worksheet = spreadsheet.worksheet('StayPermit')
     worksheet.clear()
-    headers_new = ["Name", "Type of Stypermit", "Visa type",  "Arrival date", "Issue date", "Expired data", "Status", "Account"]
+    headers_new = ["Name", "Type of Stypermit", "Visa type",  "Arrival date", "Issue date", "Expired data", "Status","Action Link", "Account",]
     worksheet.append_row(headers_new)
 
     for index, name in enumerate(name_account, 0):
@@ -567,6 +609,8 @@ while True:
 
                     # Извлечение статуса
                     status = extract_status(safe_get(res, 'status'))
+                    action_result = extract_action_link(safe_get(res, 'action'))
+
 
                     client_data.append([
                         full_name,
@@ -576,6 +620,7 @@ while True:
                         issue_data,
                         expired_data,
                         status,
+                        action_result,
                         name
                     ])
 
@@ -594,4 +639,4 @@ while True:
 
         print(f'Заполнили гугл таблицу по данным из аккаунта {name} ')
 
-    time.sleep(10000)
+    time.sleep(600)
