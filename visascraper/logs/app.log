@@ -1,0 +1,6 @@
+2025-06-30 15:32:50,379 - INFO - [main] Запуск начального парсинга...
+2025-06-30 15:32:50,379 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-06-30 15:32:50,380 - INFO - [dispatcher] Start polling
+2025-06-30 15:32:50,549 - INFO - [dispatcher] Run polling for bot @visa_indonesias_bot id=7996280945 - 'visa-indonesia'
+2025-06-30 15:33:02,875 - INFO - [main] Запрос на Batch Application <Response [200]>
+2025-06-30 15:33:10,380 - INFO - [main] Спарсили 10 Batch Application

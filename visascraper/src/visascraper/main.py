@@ -1,642 +1,584 @@
-from python_rucaptcha.re_captcha import ReCaptcha
-import time
+from visascraper.database.db import init_db
+from visascraper.database.models import BatchApplication, StayPermit
+from src.visascraper.infrasctructure.google_sheets import setup_google_sheet, prepare_worksheet
+from visascraper.session_manager import login, check_session, load_session, save_value
+from src.visascraper.utils.driver_uploader import upload_to_drive
+from src.visascraper.utils.logger import logger as logging
+from src.visascraper.utils.parser import safe_get, extract_status_batch, extract_status, extract_action_link, extract_reg_number, extract_visa, extract_detail
+from visascraper.bot.bot import dp, bot
+from visascraper.bot.handler import router as bot_router
+from src.visascraper.utils.scheduler import start_scheduler as start_notification_scheduler
+from visascraper.database.crud import save_batch_data, save_stay_permit_data
+from apscheduler.schedulers.background import BackgroundScheduler
+from visascraper.database.db import SessionLocal
+from aiogram import Bot, Dispatcher
+from aiogram.fsm.storage.memory import MemoryStorage
+import gspread
+from apscheduler.executors.pool import ThreadPoolExecutor
+from datetime import datetime
+from dotenv import load_dotenv
 from curl_cffi import requests
 from bs4 import BeautifulSoup
-import lxml
+from zoneinfo import ZoneInfo
+# Загрузка переменных из .env
+import os
+import sys
+import threading
+import asyncio
+import time
 import json
-import gspread
+load_dotenv()
 
-RUCAPTCHA_KEY = 'bd9c67bafe49a8410846e953fd04ff49'
+# Подключение роутера
+dp = Dispatcher(storage=MemoryStorage())
+dp.include_router(bot_router)
 
+error_counter = 0
+MAX_ERRORS_BEFORE_RESTART = 5
 
-def safe_get(data: dict, key: str) -> str:
-    """Безопасно извлекает значение из словаря, возвращая '' если ключ отсутствует или значение None."""
-    return data.get(key) if data.get(key) is not None else ''
+# Функция сохранения данных в БД
+session = requests.Session()
 
-def extract_status(html_content: str) -> str:
-    """Извлекает текст статуса из HTML-контента."""
-    if not html_content:
-        return ''
+# === Глобальные переменные для хранения временных данных ===
+cached_batch_application_data = []
+cached_manager_data = []
+cached_stay_permit_data = []
+
+def download_pdf(session_id: str, pdf_url: str) -> bytes | None:
+    cookies = {'PHPSESSID': session_id}
+    headers = {
+        'User-Agent': 'Mozilla/5.0',
+        'Referer': 'https://evisa.imigrasi.go.id/ ',
+    }
     try:
-        soup = BeautifulSoup(html_content, 'lxml')
-        status_span = soup.find('span')
-        return status_span.text.strip() if status_span else ''
+        response = session.get(pdf_url, cookies=cookies, headers=headers)
+        if response.status_code == 200 and 'application/pdf' in response.headers['Content-Type']:
+            return response.content
+        else:
+            print(f"Ошибка загрузки PDF: {response.status_code}, Content-Type: {response.headers.get('Content-Type')}")
+            return None
     except Exception as e:
-        print(f"Error extracting status: {e}")
-        return ''
-
-def extract_action_link(html_content: str) -> str:
-    """Извлекает ссылку из action-HTML, добавляя базовый URL, если ссылка найдена."""
-    base_url = "https://evisa.imigrasi.go.id" 
-    if not html_content:
-        return ''
-    try:
-        soup = BeautifulSoup(html_content, 'lxml')
-        action_link = soup.find('a', class_='btn btn-sm btn-outline-info')
-        if action_link and action_link.has_attr('href'):
-            return f"{base_url}{action_link['href']}"
-        return ''
-    except Exception as e:
-        print(f"Error extracting action link: {e}")
-        return ''
-    
-
-def extract_reg_number(html_content: str) -> str:
-    """Извлекает номер регистрации"""
-    if not html_content:
-        return ''
-    try:
-        reg_number = BeautifulSoup(html_content, 'lxml')
-        number = reg_number.find('a').text
-        return number
-    except:
-        return html_content
-    
-def extract_visa(html_content: str) -> str:
-    """Извлекает ссылку на пдф визы"""
-    if not html_content:
-        return ''
-    try:
-        action_link = BeautifulSoup(html_content, 'lxml')
-        link = action_link.find('a', class_='fw-bold btn btn-sm btn-outline-info btn-back')['href']
-        return link
-    except:
-        return ''
-    
-def extract_status_batch(html_content: str) -> str:
-    """Извлекает текст статуса из HTML-контента."""
-    if not html_content:
-        return ''
-    try:
-        soup = BeautifulSoup(html_content, 'lxml')
-        status_span = soup.find('span')
-        return status_span.text.strip() if status_span else ''
-    except Exception as e:
-        print(f"Error extracting status: {e}")
-        return ''
-
-def save_value(name, value):
-    with open("src/data.json", "w") as f:
-        json.dump({name: value}, f)
-
-def load_value(name):
-    try:
-        with open("src/data.json", "r") as f:
-            data = json.load(f)
-            return data.get(name)
-    except FileNotFoundError:
+        print(f"Ошибка при загрузке PDF: {e}")
         return None
 
 
-def login(name, password):
-    session = requests.Session()
-    headers = {
-        'Host': 'evisa.imigrasi.go.id',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:139.0) Gecko/20100101 Firefox/139.0',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
-        # 'Accept-Encoding': 'gzip, deflate',
-        'Upgrade-Insecure-Requests': '1',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Sec-Fetch-User': '?1',
-        'Priority': 'u=0, i',
-        # Requests doesn't support trailers
-        # 'Te': 'trailers',
-        # 'Cookie': '_ga_RLK0ZH5KF3=GS2.1.s1749006893$o3$g1$t1749007915$j52$l0$h0; _ga=GA1.1.802994217.1748517355; PHPSESSID=88c70irka1brlloog0mptcnd62; dtCookieqlpedpe2=v_4_srv_1_sn_F9313A0FC5C47A3E235016B65A7F4D47_perc_100000_ol_0_mul_1_app-3A93092c04db681869_0',
-    }
+def fetch_and_update_batch(name, session_id):
 
-    response = session.get('https://evisa.imigrasi.go.id/front/login',headers=headers)
-    print('Начальный сайт с капчей', response)
+    offset = 0
+    client_data = []
+    manager_data = []
+    client_data_table = []
 
-    soup = BeautifulSoup(response.text, 'lxml')
+    attempt = 0
+    max_attempts = 3
+    while attempt < max_attempts:
+        temp_counter = 0
+        try:
+            while True:
+                cookies = {'PHPSESSID': session_id}
+                headers = {
+                    'Host': 'evisa.imigrasi.go.id',
+                    'User-Agent': 'Mozilla/5.0',
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
 
-    recaptcha_key = soup.find('div', class_='g-recaptcha')['data-sitekey']
-    csrf_token = soup.find('input', attrs={'name':'csrf_token'})['value']
+                data = {
+                    'draw': '1',
+                    'columns[0][data]': 'no',
+                    'columns[0][searchable]': 'true',
+                    'columns[0][orderable]': 'true',
+                    'columns[0][search][value]': '',
+                    'columns[0][search][regex]': 'false',
+                    'columns[1][data]': 'header_code',
+                    'columns[1][searchable]': 'true',
+                    'columns[1][orderable]': 'true',
+                    'columns[1][search][value]': '',
+                    'columns[1][search][regex]': 'false',
+                    'start': str(offset),
+                    'length': '100000',
+                    'search[value]': '',
+                    'search[regex]': 'false'
+                }
 
-    if recaptcha_key:
-        print('Нашли капчу... Решаем ее')
-    else:
-        print('Не нашли на сайте капчу, заканчиваем  цикл')
-        return '0'
+                response = session.post(
+                    'https://evisa.imigrasi.go.id/web/applications/batch/data', 
+                    headers=headers,
+                    data=data,
+                    cookies=cookies
+                )
+                logging.info(f'Запрос на Batch Application {response}')
 
+                if response.status_code != 200:
+                    print(f"Ошибка получения данных для Batch от {name} {response.status_code}")
+                    break
 
+                result = response.json().get('data', [])
+                if not result:
+                    break
 
-    # Решаем reCAPTCHA
-    result = ReCaptcha(rucaptcha_key=RUCAPTCHA_KEY,
-        websiteKey=recaptcha_key,
-        websiteURL='https://evisa.imigrasi.go.id/front/login'
-    ).captcha_handler()
-
-
-    if result.get('solution') is None:
-        print("Ошибка решения капчи:", result.get('errorDescription'))
-    else:
-        captcha_token = result.get('solution', {}).get('gRecaptchaResponse')
-        print("Решение капчи:", captcha_token)
-
-        headers = {
-            'Host': 'evisa.imigrasi.go.id',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:139.0) Gecko/20100101 Firefox/139.0',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
-            # 'Accept-Encoding': 'gzip, deflate',
-            'Content-Type': 'application/x-www-form-urlencoded',
-            # 'Content-Length': '1185',
-            'Origin': 'https://evisa.imigrasi.go.id',
-            'Referer': 'https://evisa.imigrasi.go.id/front/login',
-            'Upgrade-Insecure-Requests': '1',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'same-origin',
-            'Sec-Fetch-User': '?1',
-            'Priority': 'u=0, i',
-            # Requests doesn't support trailers
-            # 'Te': 'trailers',
-            # 'Cookie': '_ga_RLK0ZH5KF3=GS2.1.s1749011998$o4$g1$t1749012146$j59$l0$h0; _ga=GA1.1.802994217.1748517355; dtCookieqlpedpe2=v_4_srv_1_sn_F9313A0FC5C47A3E235016B65A7F4D47_perc_100000_ol_0_mul_1_app-3A93092c04db681869_0; PHPSESSID=lhmc9sp82ampq88iptqchvopl5',
-        }
-
-        data = {
-            'csrf_token': csrf_token,
-            '_username': name,
-            '_password': password,
-            'g-recaptcha-response': captcha_token,
-        }
-
-        response = session.post('https://evisa.imigrasi.go.id/front/login',headers=headers, data=data)
-
-        print(response)
-        session_id = response.cookies.get('PHPSESSID')
-        save_value(name, session_id)
-        return session_id
-    
-
-def check_session(session_id: str) -> bool:
-    cookies = {
-    'PHPSESSID': session_id,
-    }
-
-    headers = {
-        'Host': 'evisa.imigrasi.go.id',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:139.0) Gecko/20100101 Firefox/139.0',
-        'Accept': 'application/json, text/javascript, */*; q=0.01',
-        'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
-        # 'Accept-Encoding': 'gzip, deflate',
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'X-Requested-With': 'XMLHttpRequest',
-        # 'Content-Length': '2221',
-        'Origin': 'https://evisa.imigrasi.go.id',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Site': 'same-origin',
-        'Priority': 'u=0',
-        # Requests doesn't support trailers
-        # 'Te': 'trailers',
-        # 'Cookie': 'PHPSESSID=j58aq4t685in39boic4t7jgkeh',
-    }
-
-    data = {
-        'draw': '1',
-        'columns[0][data]': 'no',
-        'columns[0][name]': '',
-        'columns[0][searchable]': 'true',
-        'columns[0][orderable]': 'true',
-        'columns[0][search][value]': '',
-        'columns[0][search][regex]': 'false',
-        'columns[1][data]': 'header_code',
-        'columns[1][name]': '',
-        'columns[1][searchable]': 'true',
-        'columns[1][orderable]': 'true',
-        'columns[1][search][value]': '',
-        'columns[1][search][regex]': 'false',
-        'columns[2][data]': 'register_number',
-        'columns[2][name]': '',
-        'columns[2][searchable]': 'true',
-        'columns[2][orderable]': 'true',
-        'columns[2][search][value]': '',
-        'columns[2][search][regex]': 'false',
-        'columns[3][data]': 'full_name',
-        'columns[3][name]': '',
-        'columns[3][searchable]': 'true',
-        'columns[3][orderable]': 'true',
-        'columns[3][search][value]': '',
-        'columns[3][search][regex]': 'false',
-        'columns[4][data]': 'request_code',
-        'columns[4][name]': '',
-        'columns[4][searchable]': 'true',
-        'columns[4][orderable]': 'true',
-        'columns[4][search][value]': '',
-        'columns[4][search][regex]': 'false',
-        'columns[5][data]': 'passport_number',
-        'columns[5][name]': '',
-        'columns[5][searchable]': 'true',
-        'columns[5][orderable]': 'true',
-        'columns[5][search][value]': '',
-        'columns[5][search][regex]': 'false',
-        'columns[6][data]': 'paid_date',
-        'columns[6][name]': '',
-        'columns[6][searchable]': 'true',
-        'columns[6][orderable]': 'true',
-        'columns[6][search][value]': '',
-        'columns[6][search][regex]': 'false',
-        'columns[7][data]': 'visa_type',
-        'columns[7][name]': '',
-        'columns[7][searchable]': 'true',
-        'columns[7][orderable]': 'true',
-        'columns[7][search][value]': '',
-        'columns[7][search][regex]': 'false',
-        'columns[8][data]': 'status',
-        'columns[8][name]': '',
-        'columns[8][searchable]': 'true',
-        'columns[8][orderable]': 'true',
-        'columns[8][search][value]': '',
-        'columns[8][search][regex]': 'false',
-        'columns[9][data]': 'actions',
-        'columns[9][name]': '',
-        'columns[9][searchable]': 'true',
-        'columns[9][orderable]': 'true',
-        'columns[9][search][value]': '',
-        'columns[9][search][regex]': 'false',
-        'start': '0',
-        'length': '1',
-        'search[value]': '',
-        'search[regex]': 'false',
-    }
-
-    response = requests.post(
-        'https://evisa.imigrasi.go.id/web/applications/batch/data',
-        cookies=cookies,
-        headers=headers,
-        data=data,
-    )
-
-    if response.status_code == 200:
-        return True
-    
-
-
-
-# Цикл
-while True:
-    print('Запускаем программу')
-    credentials = {
-    "type": "service_account",
-    "project_id": "visa-center-462016",
-    "private_key_id": "158c9eeee827bfa534c1db5bac80de58215e0cca",
-    "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCyFZ+wXN8S9RxY\nq6cangLSPKRNtYgAOIhz58Mv861zGS3KLsHg4wc4xDuk+cS00yB12L6suxDVQ7zy\nUR4tT8oYN1rGXVRyoNr4dZShluFva0ndtiKjDfO5EYDZuZRWTTnXg/2ro7qhPNNN\nsHc+kyF//6KQ/fjZnfC4ooBT+vElvOFGdkr61fww4ywORU4XjUEQTqenlRjSWcDT\n8P29k7TRyz+TLi5w4TUAQCuEoN3gtFVDOleM/pPDdpuXLMmuIbnBoO1gEP0F6ZTS\ncVocZsvnKcUfauqD584GeNX1rTk2vldquVa+oshnuJ6amV12EmNg0aZmlKbA/SZf\nBdz/1AT3AgMBAAECggEAVzuFZggQE4KyeHLY345wFlizKQeXj3ghyxjHgUktePhn\n+CZQPR8oTfO9vbHFW8ghmehqekUF2Vmdh9sZW5u+hH80/X8BG0dVC6jY/hBg7EmT\nPMH3lISEku6SfdRMZ7vbbgjPLRD+HfYkEWWz+5hpq//mO3zUtZCKtn6POtPs5Q0f\nuAvpaC+0pmlocEBZ2trocOEb4pyHeJLOVAk2WjOyWHCi8/dVNkyvcCakgZebXa9q\nn6tJR4wr9id9CQIUDGeqTf1uF/pYnEP3AO3I1qg5D3JpynSuPNyP5UZNM36Vt36P\n/NRAj99c40F3ruk2eJrh9QSh2LRhP1a6LsCFwn003QKBgQDeXSWsfR3PBeEqftgB\nwzrkb7HYfvomZO3mlfAhWzPmetsBe8oiVma7gnoForg0BkYsLaNcBydA9FOOzfS0\n1/kDIiNHBeIzFYWo0OetoUDt4Wg5DZMJwfYWsNnSGsAo923CzKXjhriey5cuWo7l\nLpwXFP4HFTZMWtNaNMOjau/MLQKBgQDNBctuGvRz4nGdIfaX8g3sNIfEOU/7gWpA\nG/K4FMxftn4VxpNMapczXoV/cA5+oR2aosxWBbMv6QnRN4NLx9vwB6a7ydFS0NGf\n1bhHQPY43sDQymZ81E+b/cjw4rTyDi6R0sPp6MPLnCrrq/rgcWWedC5AzEPdyNPT\nIYRdb0a4MwKBgFNBmQt+RRzwXKAmogX27SP+1h3zXQHnJFQDq8cxeLtBIKLrkIFO\nzGREtB9MD6AbAUclR1b7rqzZTjfX0Vmsy6VqsL606z6pPkQ5A6W1DLSEgxtpg7ZR\nkyxnxwat0WkFS2l2al5IYPPD0rUeXwZcb0ENMRfBz3TDRQMvYljbfzF5AoGBALWY\nLFeaCGucZoWHT6PGAg71eEuVeAKM3k9qcdIamess+QDQoidNQh992UDHQA9pJY+S\nIusOoWgOQWPOh7zXiTdRj51FZOK1kva/ljmGkJBOvPoyTBTE+L5yS0kRhLPhW95N\nkLneMY5nBJ059zxVNGzk+xLp2jLXbsfTKCqaJUmBAoGBANGz9VeNAzPQLG+Z2PaX\nDDHN3KK31zf5hbTC60UDKKGFhcG9xqn+zCAXWu1zEwk9FTGlfrZrLfbL6qhIEUVA\nhfUx1Ka/0ofSGY1cK3rjXI9N57Q23Row4Bym1c3E63u9iD7pmqYethxHVjY6nBaa\nI4HYguvQQsgV6XbMKwUHbuaC\n-----END PRIVATE KEY-----\n",
-    "client_email": "visa-center@visa-center-462016.iam.gserviceaccount.com",
-    "client_id": "116963795642618736681",
-    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-    "token_uri": "https://oauth2.googleapis.com/token",
-    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/visa-center%40visa-center-462016.iam.gserviceaccount.com",
-    "universe_domain": "googleapis.com"
-    }
-
-
-    gc = gspread.service_account_from_dict(credentials)
-    spreadsheet = gc.open_by_key("1egoXzhwNY3XD3y8s2zh688OO80fCMJ4QQakN4-dlqCA")  # ID таблицы из URL
-    worksheet_account = spreadsheet.worksheet('Аккаунты')
-    name_account = worksheet_account.col_values(1)
-    password_account = worksheet_account.col_values(2)
-    try:
-        worksheet = spreadsheet.worksheet('Batch Application')
-    except:
-        worksheet = spreadsheet.add_worksheet('Batch Application')
-    worksheet.clear()
-    try:
-        worksheet_manager = spreadsheet.worksheet('Batch Application(Manager)')
-    except:
-        worksheet_manager = spreadsheet.add_worksheet('Batch Application(Manager)', rows=100, cols=100)
-    worksheet_manager.clear()
-    headers = ["Batch No", "Register Number", "Full Name", "Visitor Visa Number", "Passport Number", "Payment Date", "Visa Type", "Status", "Action Link", "Account"]
-    headers_manager = ["Full Name", 'Visa Type', 'Payment Date', 'Status', 'Action Link']
-    worksheet.append_row(headers)
-    worksheet_manager.append_row(headers_manager)
-    for index, name in enumerate(name_account, 0):
-        print(name)
-        session_id = load_value(name)
-        if not check_session(session_id):
-            print('Наш токен входа устарел, обновляем')
-            session_id = login(name, password_account[index])
-
-        
-
-        headers = {
-            'Host': 'evisa.imigrasi.go.id',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:139.0) Gecko/20100101 Firefox/139.0',
-            'Accept': 'application/json, text/javascript, */*; q=0.01',
-            'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
-            # 'Accept-Encoding': 'gzip, deflate',
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'X-Requested-With': 'XMLHttpRequest',
-            # 'Content-Length': '2222',
-            'Origin': 'https://evisa.imigrasi.go.id',
-            'Sec-Fetch-Dest': 'empty',
-            'Sec-Fetch-Mode': 'cors',
-            'Sec-Fetch-Site': 'same-origin',
-            # Requests doesn't support trailers
-            # 'Te': 'trailers',
-            # 'Cookie': 'PHPSESSID=18o2dm4tu6jlc3fu2nptrjqqdb',
-        }
-
-        client_data = []
-        manager_data = []
-        offset = 0
-
-        while True:
-            cookies = {
-            'PHPSESSID': session_id,
-            }
-
-            data = {
-                'draw': '1',
-                'columns[0][data]': 'no',
-                'columns[0][name]': '',
-                'columns[0][searchable]': 'true',
-                'columns[0][orderable]': 'true',
-                'columns[0][search][value]': '',
-                'columns[0][search][regex]': 'false',
-                'columns[1][data]': 'header_code',
-                'columns[1][name]': '',
-                'columns[1][searchable]': 'true',
-                'columns[1][orderable]': 'true',
-                'columns[1][search][value]': '',
-                'columns[1][search][regex]': 'false',
-                'columns[2][data]': 'register_number',
-                'columns[2][name]': '',
-                'columns[2][searchable]': 'true',
-                'columns[2][orderable]': 'true',
-                'columns[2][search][value]': '',
-                'columns[2][search][regex]': 'false',
-                'columns[3][data]': 'full_name',
-                'columns[3][name]': '',
-                'columns[3][searchable]': 'true',
-                'columns[3][orderable]': 'true',
-                'columns[3][search][value]': '',
-                'columns[3][search][regex]': 'false',
-                'columns[4][data]': 'request_code',
-                'columns[4][name]': '',
-                'columns[4][searchable]': 'true',
-                'columns[4][orderable]': 'true',
-                'columns[4][search][value]': '',
-                'columns[4][search][regex]': 'false',
-                'columns[5][data]': 'passport_number',
-                'columns[5][name]': '',
-                'columns[5][searchable]': 'true',
-                'columns[5][orderable]': 'true',
-                'columns[5][search][value]': '',
-                'columns[5][search][regex]': 'false',
-                'columns[6][data]': 'paid_date',
-                'columns[6][name]': '',
-                'columns[6][searchable]': 'true',
-                'columns[6][orderable]': 'true',
-                'columns[6][search][value]': '',
-                'columns[6][search][regex]': 'false',
-                'columns[7][data]': 'visa_type',
-                'columns[7][name]': '',
-                'columns[7][searchable]': 'true',
-                'columns[7][orderable]': 'true',
-                'columns[7][search][value]': '',
-                'columns[7][search][regex]': 'false',
-                'columns[8][data]': 'status',
-                'columns[8][name]': '',
-                'columns[8][searchable]': 'true',
-                'columns[8][orderable]': 'true',
-                'columns[8][search][value]': '',
-                'columns[8][search][regex]': 'false',
-                'columns[9][data]': 'actions',
-                'columns[9][name]': '',
-                'columns[9][searchable]': 'true',
-                'columns[9][orderable]': 'true',
-                'columns[9][search][value]': '',
-                'columns[9][search][regex]': 'false',
-                'start': offset,
-                'length': '100000',
-                'search[value]': '',
-                'search[regex]': 'false',
-            }
-
-            response = requests.post(
-                'https://evisa.imigrasi.go.id/web/applications/batch/data',
-                headers=headers,
-                data=data,
-                cookies=cookies
-            )
-            print('Запрос на получении Batch Application', response)
-            result = response.json().get('data', [])
-            for res in result:
-                batch_no = safe_get(res, 'header_code').strip().replace('\n', '')
-                register_number = safe_get(res,'register_number')
-                full_name = safe_get(res, 'full_name')
-                visitor_visa_number = safe_get(res, 'request_code')
-                passport_number = safe_get(res, 'passport_number')
-                payment_date = safe_get(res, 'paid_date')
-                visa_type = safe_get(res,'visa_type')
-                status = extract_status_batch(safe_get(res, 'status'))
-                action = extract_visa(safe_get(res, 'actions'))
-                if not action.split('/')[-1] == 'print':
-                    action_link = ''
-                else:
-                    action_link = f"https://evisa.imigrasi.go.id{action}"
-
-                client_data.append([batch_no,
-                                    register_number,
-                                    full_name,
-                                    visitor_visa_number,
-                                    passport_number,
-                                    payment_date,
-                                    visa_type,
-                                    status,
-                                    action_link,
-                                    name])
-                manager_data.append([full_name,
-                                     visa_type,
-                                     payment_date,
-                                     status,
-                                     action_link])
-
-            offset += 850
-            if not result:
-                break
-        print(f'Заполняем гугл таблицу Batch Application по данным из аккаунта {name} ')
-        worksheet.append_rows(client_data)
-        worksheet_manager.append_rows(manager_data)
-
-    spreadsheet = gc.open_by_key("1tzSQbkOYFAzv8T0d_pLG8ZlHo27Le6CyC2GDJbLFTm4")  # ID таблицы из URL
-    worksheet_account = spreadsheet.worksheet('Аккаунты')
-    name_account = worksheet_account.col_values(1)
-    password_account = worksheet_account.col_values(2)
-    worksheet = spreadsheet.worksheet('StayPermit')
-    worksheet.clear()
-    headers_new = ["Name", "Type of Stypermit", "Visa type",  "Arrival date", "Issue date", "Expired data", "Status","Action Link", "Account",]
-    worksheet.append_row(headers_new)
-
-    for index, name in enumerate(name_account, 0):
-        print(name)
-        session_id = load_value(name)
-        if not check_session(session_id):
-            print('Наш токен входа устарел, обновляем')
-            session_id = login(name, password_account[index])
-        
-        offset = 0
-        client_data = []
-        while True:
-
-            cookies = {
-    'PHPSESSID': session_id,
-            }
-
-            headers = {
-                'Host': 'evisa.imigrasi.go.id',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:139.0) Gecko/20100101 Firefox/139.0',
-                'Accept': 'application/json, text/javascript, */*; q=0.01',
-                'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
-                # 'Accept-Encoding': 'gzip, deflate',
-                'X-Requested-With': 'XMLHttpRequest',
-                'Referer': 'https://evisa.imigrasi.go.id/front/applications/stay-permit?token=44ea17f.BokM81ow0IGl896FsTeMnVvKN3OhM-In8KgbiFUDrpo.YOJ7lgNYg_PKvLrzwW_nzWODQzDESoZEk9534yVq58xCwz28OXu2zvWLrQ',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-origin',
-                # Requests doesn't support trailers
-                # 'Te': 'trailers',
-                # 'Cookie': 'PHPSESSID=cjq3epk1vi4og44kg3sqc4egtn',
-            }
-
-            params = {
-                'draw': '1',
-                'columns[0][data]': 'register_number',
-                'columns[0][name]': '',
-                'columns[0][searchable]': 'true',
-                'columns[0][orderable]': 'true',
-                'columns[0][search][value]': '',
-                'columns[0][search][regex]': 'false',
-                'columns[1][data]': 'full_name',
-                'columns[1][name]': '',
-                'columns[1][searchable]': 'true',
-                'columns[1][orderable]': 'true',
-                'columns[1][search][value]': '',
-                'columns[1][search][regex]': 'false',
-                'columns[2][data]': 'permit_number',
-                'columns[2][name]': '',
-                'columns[2][searchable]': 'true',
-                'columns[2][orderable]': 'true',
-                'columns[2][search][value]': '',
-                'columns[2][search][regex]': 'false',
-                'columns[3][data]': 'type_of_staypermit',
-                'columns[3][name]': '',
-                'columns[3][searchable]': 'true',
-                'columns[3][orderable]': 'true',
-                'columns[3][search][value]': '',
-                'columns[3][search][regex]': 'false',
-                'columns[4][data]': 'visa_number',
-                'columns[4][name]': '',
-                'columns[4][searchable]': 'true',
-                'columns[4][orderable]': 'true',
-                'columns[4][search][value]': '',
-                'columns[4][search][regex]': 'false',
-                'columns[5][data]': 'type_of_visa',
-                'columns[5][name]': '',
-                'columns[5][searchable]': 'true',
-                'columns[5][orderable]': 'true',
-                'columns[5][search][value]': '',
-                'columns[5][search][regex]': 'false',
-                'columns[6][data]': 'passport_number',
-                'columns[6][name]': '',
-                'columns[6][searchable]': 'true',
-                'columns[6][orderable]': 'true',
-                'columns[6][search][value]': '',
-                'columns[6][search][regex]': 'false',
-                'columns[7][data]': 'start_date',
-                'columns[7][name]': '',
-                'columns[7][searchable]': 'true',
-                'columns[7][orderable]': 'true',
-                'columns[7][search][value]': '',
-                'columns[7][search][regex]': 'false',
-                'columns[8][data]': 'issue_date',
-                'columns[8][name]': '',
-                'columns[8][searchable]': 'true',
-                'columns[8][orderable]': 'true',
-                'columns[8][search][value]': '',
-                'columns[8][search][regex]': 'false',
-                'columns[9][data]': 'expired_date',
-                'columns[9][name]': '',
-                'columns[9][searchable]': 'true',
-                'columns[9][orderable]': 'true',
-                'columns[9][search][value]': '',
-                'columns[9][search][regex]': 'false',
-                'columns[10][data]': 'status',
-                'columns[10][name]': '',
-                'columns[10][searchable]': 'true',
-                'columns[10][orderable]': 'true',
-                'columns[10][search][value]': '',
-                'columns[10][search][regex]': 'false',
-                'columns[11][data]': 'action',
-                'columns[11][name]': '',
-                'columns[11][searchable]': 'true',
-                'columns[11][orderable]': 'true',
-                'columns[11][search][value]': '',
-                'columns[11][search][regex]': 'false',
-                'start': offset,
-                'length': '100000000',
-                'search[value]': '',
-                'search[regex]': 'false',
-                '_': '1749185171731',
-            }
-
-            response = requests.get(
-                'https://evisa.imigrasi.go.id/front/applications/stay-permit/data',
-                params=params,
-                cookies=cookies,
-                headers=headers,
-                verify=False,
-            )
-            print(f'StayPermit {response}')
-            result = response.json().get('data', [])
-            for res in result:
-                try:
-                    reg_number = extract_reg_number(safe_get(res, 'register_number'))
+                for res in result[:20]:
+                    batch_no = safe_get(res, 'header_code').strip().replace('\n', '')
+                    reg_number = safe_get(res, 'register_number')
                     full_name = safe_get(res, 'full_name')
-                    permit_number = safe_get(res, 'permit_number')
-                    type_permit = safe_get(res, 'type_of_staypermit')
-                    visa_number = safe_get(res, 'visa_number')
-                    type_visa = safe_get(res, 'type_of_visa')
+                    visitor_visa_number = safe_get(res, 'request_code')
                     passport_number = safe_get(res, 'passport_number')
-                    start_date = safe_get(res, 'start_date')
-                    issue_data = safe_get(res, 'issue_date')
-                    expired_data = safe_get(res, 'expired_date')
+                    payment_date = safe_get(res, 'paid_date')
+                    visa_type = safe_get(res, 'visa_type')
+                    status = extract_status_batch(safe_get(res, 'status'))
+                    action = extract_visa(safe_get(res, 'actions'))
+                    action_link = f"https://evisa.imigrasi.go.id{action}"  if action.split('/')[-1] == 'print' else ''
 
-                    # Извлечение статуса
-                    status = extract_status(safe_get(res, 'status'))
-                    action_result = extract_action_link(safe_get(res, 'action'))
+                    detail_link = f"https://evisa.imigrasi.go.id{extract_detail(safe_get(res, 'actions'))}"
+                    try:
+                        response = session.get(detail_link)
+                        result = response.text
+                        date_birth = result.split('Date of Birth')[-1].split('</small')[0].split('<small>')[-1]
+                    except Exception as ex:
+                        logging.error(f'Ошибка при парсинге дня рождения клиента {detail_link} {ex}')
+                        date_birth = ''
 
-
-                    client_data.append([
+                    client_data.append({
+                        "batch_no": batch_no,
+                        "register_number": reg_number,
+                        "full_name": full_name,
+                        "visitor_visa_number": visitor_visa_number,
+                        "passport_number": passport_number,
+                        "payment_date": payment_date,
+                        "visa_type": visa_type,
+                        "status": status,
+                        "action_link": action_link,
+                        "account": name,
+                        "birth_date": date_birth
+                    })
+                    client_data_table.append([
+                        batch_no,
+                        reg_number,
                         full_name,
-                        type_permit,
-                        type_visa,
-                        start_date,
-                        issue_data,
-                        expired_data,
+                        date_birth,
+                        visitor_visa_number,
+                        passport_number,
+                        payment_date,
+                        visa_type,
                         status,
-                        action_result,
+                        action_link,
                         name
                     ])
+                    manager_data.append([
+                        full_name, visa_type, payment_date, status, action_link, name
+                    ])
+                    temp_counter += 1
+                    if temp_counter % 10 == 0:
+                        logging.info(f'Спарсили {temp_counter} Batch Application')
 
-                    #Debugging
-                    #print(client_data,end='\n')
+                offset += 850
 
-                except Exception as e:
-                    print(f"Error processing record: {res}. Error: {e}")
-            offset += 1250
-            if not result:
-                break
 
-        print(f'Заполняем гугл таблицу StayPermit по данным из аккаунта {name} ')
-        #print(client_data)
-        worksheet.append_rows(client_data)
+            with SessionLocal() as db:
+                save_batch_data(db, client_data)
+                logging.info("Данные Batch Application сохранены в БД")
 
-        print(f'Заполнили гугл таблицу по данным из аккаунта {name} ')
+            return client_data_table, manager_data
+        
+        except Exception as exc:
+            attempt += 1
+            logging.error(f"Ошибка в fetch_and_update_batch (аккаунт {name}, попытка {attempt}/{max_attempts}): {exc}")
+            if attempt >= max_attempts:
+                logging.warning(f"Не удалось спарсить аккаунт {name} после {max_attempts} попыток.")
+                return [], []
+            time.sleep(10)
 
-    time.sleep(600)
+
+def fetch_and_update_stay(name, session_id):
+    """Обрабатывает данные Stay Permit и загружает их в Google Sheets."""
+
+    offset = 0
+    client_data = []
+    client_write_data = []
+
+    attempt = 0
+    max_attempts = 3
+
+    while attempt < max_attempts:
+        try:
+            while True:
+                cookies = {'PHPSESSID': session_id}
+                headers = {
+                    'Host': 'evisa.imigrasi.go.id',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:139.0) Gecko/20100101 Firefox/139.0',
+                    'Accept': 'application/json, text/javascript, */*; q=0.01',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Sec-Fetch-Dest': 'empty',
+                    'Sec-Fetch-Mode': 'cors',
+                    'Sec-Fetch-Site': 'same-origin'
+                }
+
+                params = {
+                    'draw': '1',
+                    'columns[0][data]': 'register_number',
+                    'columns[0][searchable]': 'true',
+                    'columns[0][orderable]': 'true',
+                    'columns[0][search][value]': '',
+                    'columns[0][search][regex]': 'false',
+                    'columns[1][data]': 'full_name',
+                    'columns[1][searchable]': 'true',
+                    'columns[1][orderable]': 'true',
+                    'columns[1][search][value]': '',
+                    'columns[1][search][regex]': 'false',
+                    'columns[2][data]': 'permit_number',
+                    'columns[2][searchable]': 'true',
+                    'columns[2][orderable]': 'true',
+                    'columns[2][search][value]': '',
+                    'columns[2][search][regex]': 'false',
+                    'columns[3][data]': 'type_of_staypermit',
+                    'columns[3][searchable]': 'true',
+                    'columns[3][orderable]': 'true',
+                    'columns[3][search][value]': '',
+                    'columns[3][search][regex]': 'false',
+                    'columns[4][data]': 'visa_number',
+                    'columns[4][searchable]': 'true',
+                    'columns[4][orderable]': 'true',
+                    'columns[4][search][value]': '',
+                    'columns[4][search][regex]': 'false',
+                    'columns[5][data]': 'type_of_visa',
+                    'columns[5][searchable]': 'true',
+                    'columns[5][orderable]': 'true',
+                    'columns[5][search][value]': '',
+                    'columns[5][search][regex]': 'false',
+                    'columns[6][data]': 'passport_number',
+                    'columns[6][searchable]': 'true',
+                    'columns[6][orderable]': 'true',
+                    'columns[6][search][value]': '',
+                    'columns[6][search][regex]': 'false',
+                    'columns[7][data]': 'start_date',
+                    'columns[7][searchable]': 'true',
+                    'columns[7][orderable]': 'true',
+                    'columns[7][search][value]': '',
+                    'columns[7][search][regex]': 'false',
+                    'columns[8][data]': 'issue_date',
+                    'columns[8][searchable]': 'true',
+                    'columns[8][orderable]': 'true',
+                    'columns[8][search][value]': '',
+                    'columns[8][search][regex]': 'false',
+                    'columns[9][data]': 'expired_date',
+                    'columns[9][searchable]': 'true',
+                    'columns[9][orderable]': 'true',
+                    'columns[9][search][value]': '',
+                    'columns[9][search][regex]': 'false',
+                    'columns[10][data]': 'status',
+                    'columns[10][searchable]': 'true',
+                    'columns[10][orderable]': 'true',
+                    'columns[10][search][value]': '',
+                    'columns[10][search][regex]': 'false',
+                    'columns[11][data]': 'action',
+                    'columns[11][searchable]': 'true',
+                    'columns[11][orderable]': 'true',
+                    'columns[11][search][value]': '',
+                    'columns[11][search][regex]': 'false',
+                    'start': str(offset),
+                    'length': '100000000',
+                    'search[value]': '',
+                    'search[regex]': 'false',
+                    '_': str(int(time.time() * 1000)),
+                }
+
+                response = session.get(
+                    'https://evisa.imigrasi.go.id/front/applications/stay-permit/data', 
+                    headers=headers,
+                    cookies=cookies,
+                    params=params,
+                    verify=False
+                )
+                logging.info(f'Запрос на Stay Permit {response}')
+
+                if response.status_code != 200:
+                    logging.info(f"Ошибка получения данных для Stay Permit от {name}")
+                    break
+
+                result = response.json().get('data', [])
+                if not result:
+                    break
+
+                temp_counter = 0
+
+                for res in result[:20]:
+                    reg_number = res.get('register_number')
+                    full_name = res.get('full_name', '')
+                    type_permit = res.get('type_of_staypermit', '')
+                    type_visa = res.get('type_of_visa', '')
+                    start_date = res.get('start_date', '')
+                    issue_data = res.get('issue_date', '')
+                    expired_data = res.get('expired_date', '')
+                    passport_number = res.get('passport_number', '')
+                    status = extract_status(res.get('status', ''))
+                    action_result = ''
+                    try:
+                        action_html = safe_get(res, 'action')
+                        if action_html:
+                            pdf_relative_url = extract_action_link(action_html)
+                            if pdf_relative_url:
+                                temp_path = f"src/temp/{reg_number}_stay_permit.pdf"
+                                if not os.path.exists(temp_path):
+                                    #print(f"Файл {reg_number} ещё не скачан. Скачиваем...")
+                                    pdf_content = download_pdf(session_id, pdf_relative_url)
+                                    if pdf_content:
+                                        # Сохраняем временно
+                                        os.makedirs("src/temp", exist_ok=True)
+                                        with open(temp_path, "wb") as f:
+                                            f.write(pdf_content)
+                                        #print(f"Файл {reg_number} успешно сохранён локально.")
+                                    else:
+                                        #print(f"Не удалось скачать файл для {reg_number}")
+                                        action_result = ''
+                                        continue
+                                else:
+                                    pass
+                                    #print(f"Файл {reg_number} уже скачан, используем локальную копию.")
+
+                                # Читаем содержимое файла
+                                with open(temp_path, "rb") as f:
+                                    pdf_content = f.read()
+
+                                # Загружаем на Google Drive
+                                temp_counter += 1
+                                public_link = upload_to_drive(pdf_content, f"{reg_number}_stay_permit.pdf")
+                                action_result = public_link
+                                if temp_counter % 10 == 0:
+                                    logging.info(f'Скачали и вставили {temp_counter} ссылок(Stay Permit)')
+                        else:
+                            action_result = ''
+                    except Exception as e:
+                        print(f"Ошибка при обработке действия: {e}")
+                        action_result = ''
+
+                    client_data.append([
+                        full_name, type_permit, type_visa, start_date, issue_data,
+                        expired_data, status, action_result, name
+                    ])
+                    client_write_data.append({
+                        'reg_number': reg_number,
+                        "name": full_name,
+                        "type_of_staypermit": type_permit,
+                        "visa_type": type_visa,
+                        "passport_number": passport_number,
+                        "arrival_date": start_date,
+                        "issue_data": issue_data,
+                        "expired_data": expired_data,
+                        "status": status,
+                        "action_link": action_result,
+                        "account": name
+                    })
+                offset += 1250
+            with SessionLocal() as db:
+                save_stay_permit_data(db, client_write_data)
+                print("✅ Данные Stay Permit сохранены в БД")
+            logging.info(f"Данные Stay Permit для {name} успешно обновлены.")
+            return client_data
+        
+        except Exception as exc:
+            attempt += 1
+            logging.error(f"Ошибка в fetch_and_update_stay (аккаунт {name}, попытка {attempt}/{max_attempts}): {exc}")
+            if attempt >= max_attempts:
+                logging.warning(f"Не удалось спарсить Stay Permit для {name}.")
+                return []
+            time.sleep(10)
+
+
+def parse_accounts(account_names, account_passwords):
+    attempt = 0
+    max_attempts = 3
+
+    while attempt < max_attempts:
+        try:
+            credentials = json.load(open(os.getenv("GOOGLE_CREDENTIALS_JSON_PATH")))
+            gc = gspread.service_account_from_dict(credentials)
+            spreadsheet_batch = gc.open_by_key(os.getenv("GOOGLE_SHEET_BATCH_ID"))
+
+            worksheet_account = spreadsheet_batch.worksheet('Аккаунты')
+            names = worksheet_account.col_values(1)[1:]
+            passwords = worksheet_account.col_values(2)[1:]
+            if not names or not passwords:
+                logging.warning("Нет аккаунтов для парсинга")
+                return [], [], []
+
+            batch_app_table = []
+            batch_mgr_table = []
+            stay_data_table = []
+
+            for name, password in zip(account_names, account_passwords):
+                session_id = load_session(name)
+                if not check_session(session_id):
+                    session_id = login(name, password)
+                    if not session_id:
+                        continue
+                batch_app, batch_mgr = fetch_and_update_batch(name, session_id)
+                stay_data = fetch_and_update_stay(name, session_id)
+                batch_app_table.extend(batch_app)
+                batch_mgr_table.extend(batch_mgr)
+                stay_data_table.extend(stay_data)
+
+            return batch_app_table, batch_mgr_table, stay_data_table
+
+        except Exception as e:
+            attempt += 1
+            logging.error(f"Ошибка в parse_accounts (попытка {attempt}/{max_attempts}): {e}")
+            if attempt >= max_attempts:
+                logging.critical("Критическая ошибка в парсинге. Передаём управление в main для перезапуска.")
+                raise
+            time.sleep(10)
+
+
+def write_to_sheet(gc, spreadsheet_key, batch_app_data, manager_data, stay_data):
+    try:
+        credentials = json.load(open(os.getenv("GOOGLE_CREDENTIALS_JSON_PATH")))
+        gc = gspread.service_account_from_dict(credentials)
+        spreadsheet = gc.open_by_key(spreadsheet_key)
+
+        # Batch Application
+        worksheet = spreadsheet.worksheet('Batch Application')
+        worksheet_manager = spreadsheet.worksheet('Batch Application(Manager)')
+        worksheet_stay = spreadsheet.worksheet('StayPermit')
+
+        worksheet.clear()
+        worksheet_manager.clear()
+        worksheet_stay.clear()
+
+        # Заголовки
+        worksheet.append_row([
+            "Batch No", "Register Number", "Full Name", "Date of Birth",
+            "Visitor Visa Number", "Passport Number", "Payment Date",
+            "Visa Type", "Status", "Action Link", "Account"
+        ])
+        worksheet_manager.append_row([
+            "Full Name", "Visa Type", "Payment Date", "Status", "Action Link", "Account"
+        ])
+        worksheet_stay.append_row([
+            "Name", "Type of Stypermit", "Visa type", "Arrival date",
+            "Issue date", "Expired data", "Status", "Action Link", "Account"
+        ])
+
+        # Данные
+        if batch_app_data:
+            worksheet.append_rows(batch_app_data)
+        if manager_data:
+            worksheet_manager.append_rows(manager_data)
+        if stay_data:
+            worksheet_stay.append_rows(stay_data)
+
+        logging.info("✅ Все данные успешно записаны в Google Sheets")
+
+    except Exception as e:
+        logging.error(f"❌ Ошибка при записи в Google Sheets: {e}")
+
+
+def job_first_two():
+    global cached_batch_application_data, cached_manager_data, cached_stay_permit_data
+    logging.info("Запуск задачи для первых двух аккаунтов")
+
+    try:
+        credentials = json.load(open(os.getenv("GOOGLE_CREDENTIALS_JSON_PATH")))
+        gc = gspread.service_account_from_dict(credentials)
+        spreadsheet_batch = gc.open_by_key(os.getenv("GOOGLE_SHEET_BATCH_ID"))
+        worksheet_account = spreadsheet_batch.worksheet('Аккаунты')
+        names = worksheet_account.col_values(1)
+        passwords = worksheet_account.col_values(2)
+        if len(names) < 2:
+            logging.warning("Недостаточно аккаунтов для выполнения задачи первых двух")
+            return
+
+        first_two_names = names[:2]
+        first_two_passwords = passwords[:2]
+
+        batch_app, batch_mgr, stay = parse_accounts(first_two_names, first_two_passwords)
+
+        cached_batch_application_data = batch_app
+        cached_manager_data = batch_mgr
+        cached_stay_permit_data = stay
+
+        write_to_sheet(gc, os.getenv("GOOGLE_SHEET_BATCH_ID"), batch_app, batch_mgr, stay)
+
+    except Exception as e:
+        logging.error(f"[job_first_two] Критическая ошибка: {e}", exc_info=True)
+        raise  # передаём ошибку выше, чтобы main() мог перезапустить
+
+
+def job_others():
+    logging.info("Запуск задачи для остальных аккаунтов")
+
+    try:
+        credentials = json.load(open(os.getenv("GOOGLE_CREDENTIALS_JSON_PATH")))
+        gc = gspread.service_account_from_dict(credentials)
+        spreadsheet_batch = gc.open_by_key(os.getenv("GOOGLE_SHEET_BATCH_ID"))
+        worksheet_account = spreadsheet_batch.worksheet('Аккаунты')
+        names = worksheet_account.col_values(1)
+        passwords = worksheet_account.col_values(2)
+        if len(names) <= 2:
+            logging.info("Недостаточно аккаунтов для выполнения полного цикла")
+            return
+
+        remaining_names = names[2:]
+        remaining_passwords = passwords[2:]
+
+        batch_app_new, batch_mgr_new, stay_new = parse_accounts(remaining_names, remaining_passwords)
+
+        full_batch = cached_batch_application_data + batch_app_new
+        full_manager = cached_manager_data + batch_mgr_new
+        full_stay = cached_stay_permit_data + stay_new
+
+        write_to_sheet(gc, os.getenv("GOOGLE_SHEET_BATCH_ID"), full_batch, full_manager, full_stay)
+
+    except Exception as e:
+        logging.error(f"[job_others] Критическая ошибка: {e}", exc_info=True)
+        raise
+
+
+# === Функция запуска планировщика ===
+scheduler_jobs = None  # Для APScheduler парсинга
+
+
+def start_parser_scheduler():
+    global scheduler_jobs
+    scheduler_jobs = BackgroundScheduler(timezone=ZoneInfo("Europe/Moscow"),
+                                         executors={'default': ThreadPoolExecutor(1)})
+    scheduler_jobs.add_job(job_first_two, 'interval', minutes=10)
+    scheduler_jobs.add_job(job_others,'cron', hour=7, minute=0)
+    scheduler_jobs.start()
+    logging.info("Планировщик парсинга запущен")
+
+async def run_bot():
+    await dp.start_polling(bot)
+
+# === Основная функция ===
+def main():
+    global error_counter
+    init_db()
+
+    # Запуск бота
+    bot_thread = threading.Thread(target=lambda: asyncio.run(run_bot()))
+    bot_thread.start()
+
+    while True:
+        try:
+            logging.info("Запуск начального парсинга...")
+            job_first_two()
+            job_others()
+            start_parser_scheduler()
+            start_notification_scheduler()
+            logging.info("Основной поток работает")
+            break
+        except Exception as e:
+            error_counter += 1
+            logging.error(f"Ошибка в основном потоке (попытка {error_counter}/{MAX_ERRORS_BEFORE_RESTART}): {e}")
+            if error_counter >= MAX_ERRORS_BEFORE_RESTART:
+                logging.critical("Превышено количество попыток. Перезапуск программы через 60 секунд...")
+                time.sleep(60)
+                os.execv(sys.executable, [sys.executable] + sys.argv)
+            else:
+                logging.warning(f"Перезапуск через 30 секунд...")
+                time.sleep(30)
+
+
+
+if __name__ == "__main__":
+    main()
