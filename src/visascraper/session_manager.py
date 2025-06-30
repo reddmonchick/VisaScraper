@@ -2,7 +2,7 @@ import json
 import time
 from curl_cffi import requests
 from bs4 import BeautifulSoup
-from .captcha_solver import solve_recaptcha
+from captcha_solver import solve_recaptcha
 
 def save_value(name, value):
     try:

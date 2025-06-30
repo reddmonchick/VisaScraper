@@ -1,16 +1,16 @@
-from visascraper.database.db import init_db
-from visascraper.database.models import BatchApplication, StayPermit
-from src.visascraper.infrasctructure.google_sheets import setup_google_sheet, prepare_worksheet
-from visascraper.session_manager import login, check_session, load_session, save_value
-from src.visascraper.utils.driver_uploader import upload_to_drive
-from src.visascraper.utils.logger import logger as logging
-from src.visascraper.utils.parser import safe_get, extract_status_batch, extract_status, extract_action_link, extract_reg_number, extract_visa, extract_detail
-from visascraper.bot.bot import dp, bot
-from visascraper.bot.handler import router as bot_router
-from src.visascraper.utils.scheduler import start_scheduler as start_notification_scheduler
-from visascraper.database.crud import save_batch_data, save_stay_permit_data
+from database.db import init_db
+from database.models import BatchApplication, StayPermit
+from infrasctructure.google_sheets import setup_google_sheet, prepare_worksheet
+from session_manager import login, check_session, load_session, save_value
+from utils.driver_uploader import upload_to_drive
+from utils.logger import logger as logging
+from utils.parser import safe_get, extract_status_batch, extract_status, extract_action_link, extract_reg_number, extract_visa, extract_detail
+from bot.bot import dp, bot
+from bot.handler import router as bot_router
+from utils.scheduler import start_scheduler as start_notification_scheduler
+from database.crud import save_batch_data, save_stay_permit_data
 from apscheduler.schedulers.background import BackgroundScheduler
-from visascraper.database.db import SessionLocal
+from database.db import SessionLocal
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 import gspread
@@ -118,7 +118,7 @@ def fetch_and_update_batch(name, session_id):
                 if not result:
                     break
 
-                for res in result[:20]:
+                for res in result:
                     batch_no = safe_get(res, 'header_code').strip().replace('\n', '')
                     reg_number = safe_get(res, 'register_number')
                     full_name = safe_get(res, 'full_name')
@@ -302,7 +302,7 @@ def fetch_and_update_stay(name, session_id):
 
                 temp_counter = 0
 
-                for res in result[:20]:
+                for res in result:
                     reg_number = res.get('register_number')
                     full_name = res.get('full_name', '')
                     type_permit = res.get('type_of_staypermit', '')

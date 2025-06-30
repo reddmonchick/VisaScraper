@@ -1,8 +1,8 @@
 from aiogram import Bot
 from datetime import date, timedelta
 import os
-from visascraper.database.db import SessionLocal
-from visascraper.database.models import BatchApplication, StayPermit
+from database.db import SessionLocal
+from database.models import BatchApplication, StayPermit
 
 # === Инициализация бота ===
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")

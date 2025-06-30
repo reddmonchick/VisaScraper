@@ -1,5 +1,5 @@
 from apscheduler.schedulers.background import BackgroundScheduler
-from src.visascraper.bot.notification import notify_approved_users, check_birthdays, check_visa_expirations
+from bot.notification import notify_approved_users, check_birthdays, check_visa_expirations
 import asyncio
 from zoneinfo import ZoneInfo
 

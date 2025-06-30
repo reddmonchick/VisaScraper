@@ -6,9 +6,9 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 
-from visascraper.database.db import SessionLocal
-from visascraper.database.models import User
-from visascraper.database.crud import search_by_passport
+from database.db import SessionLocal
+from database.models import User
+from database.crud import search_by_passport
 
 load_dotenv()
 
