@@ -1,8 +1,8 @@
-database.db
-.env
-venv
-__pycache__/
-.bot_data
-.db_data
-src/drive_account.json
-src/service_acc.json
+visascraper/database.db
+visascraper/.env
+visascraper/.venv
+visascraper/__pycache__/
+visascraper/.bot_data
+visascraper/.db_data
+visascraper/src/drive_account.json
+visascraper/src/service_account.json
