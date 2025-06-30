@@ -4,3 +4,384 @@
 2025-06-30 15:32:50,549 - INFO - [dispatcher] Run polling for bot @visa_indonesias_bot id=7996280945 - 'visa-indonesia'
 2025-06-30 15:33:02,875 - INFO - [main] Запрос на Batch Application <Response [200]>
 2025-06-30 15:33:10,380 - INFO - [main] Спарсили 10 Batch Application
+2025-06-30 16:45:28,580 - INFO - [main] Запуск начального парсинга...
+2025-06-30 16:45:28,581 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-06-30 16:45:28,581 - INFO - [dispatcher] Start polling
+2025-06-30 16:45:28,731 - INFO - [dispatcher] Run polling for bot @visa_indonesias_bot id=7996280945 - 'visa-indonesia'
+2025-06-30 16:45:28,762 - ERROR - [main] [job_first_two] Критическая ошибка: ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+Traceback (most recent call last):
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\src\visascraper\main.py", line 482, in job_first_two
+    spreadsheet_batch = gc.open_by_key(os.getenv("GOOGLE_SHEET_BATCH_ID"))
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\client.py", line 168, in open_by_key
+    spreadsheet = Spreadsheet(self.http_client, {"id": key})
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\spreadsheet.py", line 29, in __init__
+    metadata = self.fetch_sheet_metadata()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\spreadsheet.py", line 230, in fetch_sheet_metadata
+    return self.client.fetch_sheet_metadata(self.id, params=params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\http_client.py", line 305, in fetch_sheet_metadata
+    r = self.request("get", url, params=params)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\http_client.py", line 114, in request
+    response = self.session.request(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\transport\requests.py", line 535, in request
+    self.credentials.before_request(auth_request, method, url, request_headers)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\credentials.py", line 239, in before_request
+    self._blocking_refresh(request)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\credentials.py", line 202, in _blocking_refresh
+    self.refresh(request)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\service_account.py", line 448, in refresh
+    access_token, expiry, _ = _client.jwt_grant(
+                              ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 299, in jwt_grant
+    response_data = _token_endpoint_request(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 270, in _token_endpoint_request
+    _handle_error_response(response_data, retryable_error)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 69, in _handle_error_response
+    raise exceptions.RefreshError(
+google.auth.exceptions.RefreshError: ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+2025-06-30 16:45:28,768 - ERROR - [main] Ошибка в основном потоке (попытка 1/5): ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+2025-06-30 16:45:28,768 - WARNING - [main] Перезапуск через 30 секунд...
+2025-06-30 16:46:52,054 - INFO - [main] Запуск начального парсинга...
+2025-06-30 16:46:52,055 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-06-30 16:46:52,055 - INFO - [dispatcher] Start polling
+2025-06-30 16:46:52,238 - INFO - [dispatcher] Run polling for bot @visa_indonesias_bot id=7996280945 - 'visa-indonesia'
+2025-06-30 16:46:52,247 - ERROR - [main] [job_first_two] Критическая ошибка: ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+Traceback (most recent call last):
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\src\visascraper\main.py", line 482, in job_first_two
+    spreadsheet_batch = gc.open_by_key(os.getenv("GOOGLE_SHEET_BATCH_ID"))
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\client.py", line 168, in open_by_key
+    spreadsheet = Spreadsheet(self.http_client, {"id": key})
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\spreadsheet.py", line 29, in __init__
+    metadata = self.fetch_sheet_metadata()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\spreadsheet.py", line 230, in fetch_sheet_metadata
+    return self.client.fetch_sheet_metadata(self.id, params=params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\http_client.py", line 305, in fetch_sheet_metadata
+    r = self.request("get", url, params=params)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\http_client.py", line 114, in request
+    response = self.session.request(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\transport\requests.py", line 535, in request
+    self.credentials.before_request(auth_request, method, url, request_headers)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\credentials.py", line 239, in before_request
+    self._blocking_refresh(request)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\credentials.py", line 202, in _blocking_refresh
+    self.refresh(request)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\service_account.py", line 448, in refresh
+    access_token, expiry, _ = _client.jwt_grant(
+                              ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 299, in jwt_grant
+    response_data = _token_endpoint_request(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 270, in _token_endpoint_request
+    _handle_error_response(response_data, retryable_error)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 69, in _handle_error_response
+    raise exceptions.RefreshError(
+google.auth.exceptions.RefreshError: ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+2025-06-30 16:46:52,251 - ERROR - [main] Ошибка в основном потоке (попытка 1/5): ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+2025-06-30 16:46:52,252 - WARNING - [main] Перезапуск через 30 секунд...
+2025-06-30 16:49:27,806 - INFO - [main] Запуск начального парсинга...
+2025-06-30 16:49:27,807 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-06-30 16:49:27,845 - INFO - [dispatcher] Start polling
+2025-06-30 16:49:27,990 - ERROR - [main] [job_first_two] Критическая ошибка: ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+Traceback (most recent call last):
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\src\visascraper\main.py", line 482, in job_first_two
+    spreadsheet_batch = gc.open_by_key(os.getenv("GOOGLE_SHEET_BATCH_ID"))
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\client.py", line 168, in open_by_key
+    spreadsheet = Spreadsheet(self.http_client, {"id": key})
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\spreadsheet.py", line 29, in __init__
+    metadata = self.fetch_sheet_metadata()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\spreadsheet.py", line 230, in fetch_sheet_metadata
+    return self.client.fetch_sheet_metadata(self.id, params=params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\http_client.py", line 305, in fetch_sheet_metadata
+    r = self.request("get", url, params=params)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\http_client.py", line 114, in request
+    response = self.session.request(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\transport\requests.py", line 535, in request
+    self.credentials.before_request(auth_request, method, url, request_headers)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\credentials.py", line 239, in before_request
+    self._blocking_refresh(request)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\credentials.py", line 202, in _blocking_refresh
+    self.refresh(request)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\service_account.py", line 448, in refresh
+    access_token, expiry, _ = _client.jwt_grant(
+                              ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 299, in jwt_grant
+    response_data = _token_endpoint_request(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 270, in _token_endpoint_request
+    _handle_error_response(response_data, retryable_error)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 69, in _handle_error_response
+    raise exceptions.RefreshError(
+google.auth.exceptions.RefreshError: ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+2025-06-30 16:49:27,993 - INFO - [dispatcher] Run polling for bot @visa_indonesias_bot id=7996280945 - 'visa-indonesia'
+2025-06-30 16:49:27,998 - ERROR - [main] Ошибка в основном потоке (попытка 1/5): ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+2025-06-30 16:49:27,999 - WARNING - [main] Перезапуск через 30 секунд...
+2025-06-30 16:49:28,054 - ERROR - [dispatcher] Failed to fetch updates - TelegramConflictError: Telegram server says - Conflict: terminated by other getUpdates request; make sure that only one bot instance is running
+2025-06-30 16:49:28,054 - WARNING - [dispatcher] Sleep for 1.000000 seconds and try again... (tryings = 0, bot id = 7996280945)
+2025-06-30 16:49:57,148 - INFO - [main] Запуск начального парсинга...
+2025-06-30 16:49:57,148 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-06-30 16:49:57,188 - INFO - [dispatcher] Start polling
+2025-06-30 16:49:57,323 - ERROR - [main] [job_first_two] Критическая ошибка: ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+Traceback (most recent call last):
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\src\visascraper\main.py", line 482, in job_first_two
+    spreadsheet_batch = gc.open_by_key(os.getenv("GOOGLE_SHEET_BATCH_ID"))
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\client.py", line 168, in open_by_key
+    spreadsheet = Spreadsheet(self.http_client, {"id": key})
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\spreadsheet.py", line 29, in __init__
+    metadata = self.fetch_sheet_metadata()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\spreadsheet.py", line 230, in fetch_sheet_metadata
+    return self.client.fetch_sheet_metadata(self.id, params=params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\http_client.py", line 305, in fetch_sheet_metadata
+    r = self.request("get", url, params=params)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\http_client.py", line 114, in request
+    response = self.session.request(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\transport\requests.py", line 535, in request
+    self.credentials.before_request(auth_request, method, url, request_headers)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\credentials.py", line 239, in before_request
+    self._blocking_refresh(request)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\credentials.py", line 202, in _blocking_refresh
+    self.refresh(request)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\service_account.py", line 448, in refresh
+    access_token, expiry, _ = _client.jwt_grant(
+                              ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 299, in jwt_grant
+    response_data = _token_endpoint_request(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 270, in _token_endpoint_request
+    _handle_error_response(response_data, retryable_error)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 69, in _handle_error_response
+    raise exceptions.RefreshError(
+google.auth.exceptions.RefreshError: ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+2025-06-30 16:49:57,327 - ERROR - [main] Ошибка в основном потоке (попытка 1/5): ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+2025-06-30 16:49:57,327 - WARNING - [main] Перезапуск через 30 секунд...
+2025-06-30 16:49:57,353 - INFO - [dispatcher] Run polling for bot @visa_indonesias_bot id=7996280945 - 'visa-indonesia'
+2025-06-30 16:51:52,733 - INFO - [main] Запуск начального парсинга...
+2025-06-30 16:51:52,734 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-06-30 16:51:52,734 - INFO - [dispatcher] Start polling
+2025-06-30 16:51:52,979 - ERROR - [main] [job_first_two] Критическая ошибка: ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+Traceback (most recent call last):
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\src\visascraper\main.py", line 482, in job_first_two
+    spreadsheet_batch = gc.open_by_key(os.getenv("GOOGLE_SHEET_BATCH_ID"))
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\client.py", line 168, in open_by_key
+    spreadsheet = Spreadsheet(self.http_client, {"id": key})
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\spreadsheet.py", line 29, in __init__
+    metadata = self.fetch_sheet_metadata()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\spreadsheet.py", line 230, in fetch_sheet_metadata
+    return self.client.fetch_sheet_metadata(self.id, params=params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\http_client.py", line 305, in fetch_sheet_metadata
+    r = self.request("get", url, params=params)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\http_client.py", line 114, in request
+    response = self.session.request(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\transport\requests.py", line 535, in request
+    self.credentials.before_request(auth_request, method, url, request_headers)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\credentials.py", line 239, in before_request
+    self._blocking_refresh(request)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\credentials.py", line 202, in _blocking_refresh
+    self.refresh(request)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\service_account.py", line 448, in refresh
+    access_token, expiry, _ = _client.jwt_grant(
+                              ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 299, in jwt_grant
+    response_data = _token_endpoint_request(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 270, in _token_endpoint_request
+    _handle_error_response(response_data, retryable_error)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 69, in _handle_error_response
+    raise exceptions.RefreshError(
+google.auth.exceptions.RefreshError: ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+2025-06-30 16:51:52,983 - ERROR - [main] Ошибка в основном потоке (попытка 1/5): ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+2025-06-30 16:51:52,983 - WARNING - [main] Перезапуск через 30 секунд...
+2025-06-30 16:51:52,999 - INFO - [dispatcher] Run polling for bot @visa_indonesias_bot id=7996280945 - 'visa-indonesia'
+2025-06-30 16:52:22,985 - INFO - [main] Запуск начального парсинга...
+2025-06-30 16:52:22,985 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-06-30 16:52:23,152 - ERROR - [main] [job_first_two] Критическая ошибка: ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+Traceback (most recent call last):
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\src\visascraper\main.py", line 482, in job_first_two
+    spreadsheet_batch = gc.open_by_key(os.getenv("GOOGLE_SHEET_BATCH_ID"))
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\client.py", line 168, in open_by_key
+    spreadsheet = Spreadsheet(self.http_client, {"id": key})
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\spreadsheet.py", line 29, in __init__
+    metadata = self.fetch_sheet_metadata()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\spreadsheet.py", line 230, in fetch_sheet_metadata
+    return self.client.fetch_sheet_metadata(self.id, params=params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\http_client.py", line 305, in fetch_sheet_metadata
+    r = self.request("get", url, params=params)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\http_client.py", line 114, in request
+    response = self.session.request(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\transport\requests.py", line 535, in request
+    self.credentials.before_request(auth_request, method, url, request_headers)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\credentials.py", line 239, in before_request
+    self._blocking_refresh(request)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\credentials.py", line 202, in _blocking_refresh
+    self.refresh(request)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\service_account.py", line 448, in refresh
+    access_token, expiry, _ = _client.jwt_grant(
+                              ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 299, in jwt_grant
+    response_data = _token_endpoint_request(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 270, in _token_endpoint_request
+    _handle_error_response(response_data, retryable_error)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 69, in _handle_error_response
+    raise exceptions.RefreshError(
+google.auth.exceptions.RefreshError: ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+2025-06-30 16:52:23,155 - ERROR - [main] Ошибка в основном потоке (попытка 2/5): ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+2025-06-30 16:52:23,155 - WARNING - [main] Перезапуск через 30 секунд...
+2025-06-30 16:52:53,157 - INFO - [main] Запуск начального парсинга...
+2025-06-30 16:52:53,157 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-06-30 16:52:53,337 - ERROR - [main] [job_first_two] Критическая ошибка: ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+Traceback (most recent call last):
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\src\visascraper\main.py", line 482, in job_first_two
+    spreadsheet_batch = gc.open_by_key(os.getenv("GOOGLE_SHEET_BATCH_ID"))
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\client.py", line 168, in open_by_key
+    spreadsheet = Spreadsheet(self.http_client, {"id": key})
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\spreadsheet.py", line 29, in __init__
+    metadata = self.fetch_sheet_metadata()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\spreadsheet.py", line 230, in fetch_sheet_metadata
+    return self.client.fetch_sheet_metadata(self.id, params=params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\http_client.py", line 305, in fetch_sheet_metadata
+    r = self.request("get", url, params=params)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\http_client.py", line 114, in request
+    response = self.session.request(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\transport\requests.py", line 535, in request
+    self.credentials.before_request(auth_request, method, url, request_headers)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\credentials.py", line 239, in before_request
+    self._blocking_refresh(request)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\credentials.py", line 202, in _blocking_refresh
+    self.refresh(request)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\service_account.py", line 448, in refresh
+    access_token, expiry, _ = _client.jwt_grant(
+                              ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 299, in jwt_grant
+    response_data = _token_endpoint_request(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 270, in _token_endpoint_request
+    _handle_error_response(response_data, retryable_error)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 69, in _handle_error_response
+    raise exceptions.RefreshError(
+google.auth.exceptions.RefreshError: ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+2025-06-30 16:52:53,340 - ERROR - [main] Ошибка в основном потоке (попытка 3/5): ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+2025-06-30 16:52:53,340 - WARNING - [main] Перезапуск через 30 секунд...
+2025-06-30 16:53:23,342 - INFO - [main] Запуск начального парсинга...
+2025-06-30 16:53:23,342 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-06-30 16:53:23,525 - ERROR - [main] [job_first_two] Критическая ошибка: ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+Traceback (most recent call last):
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\src\visascraper\main.py", line 482, in job_first_two
+    spreadsheet_batch = gc.open_by_key(os.getenv("GOOGLE_SHEET_BATCH_ID"))
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\client.py", line 168, in open_by_key
+    spreadsheet = Spreadsheet(self.http_client, {"id": key})
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\spreadsheet.py", line 29, in __init__
+    metadata = self.fetch_sheet_metadata()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\spreadsheet.py", line 230, in fetch_sheet_metadata
+    return self.client.fetch_sheet_metadata(self.id, params=params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\http_client.py", line 305, in fetch_sheet_metadata
+    r = self.request("get", url, params=params)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\http_client.py", line 114, in request
+    response = self.session.request(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\transport\requests.py", line 535, in request
+    self.credentials.before_request(auth_request, method, url, request_headers)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\credentials.py", line 239, in before_request
+    self._blocking_refresh(request)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\credentials.py", line 202, in _blocking_refresh
+    self.refresh(request)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\service_account.py", line 448, in refresh
+    access_token, expiry, _ = _client.jwt_grant(
+                              ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 299, in jwt_grant
+    response_data = _token_endpoint_request(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 270, in _token_endpoint_request
+    _handle_error_response(response_data, retryable_error)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 69, in _handle_error_response
+    raise exceptions.RefreshError(
+google.auth.exceptions.RefreshError: ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+2025-06-30 16:53:23,529 - ERROR - [main] Ошибка в основном потоке (попытка 4/5): ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+2025-06-30 16:53:23,529 - WARNING - [main] Перезапуск через 30 секунд...
+2025-06-30 16:53:53,530 - INFO - [main] Запуск начального парсинга...
+2025-06-30 16:53:53,530 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-06-30 16:53:53,696 - ERROR - [main] [job_first_two] Критическая ошибка: ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+Traceback (most recent call last):
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\src\visascraper\main.py", line 482, in job_first_two
+    spreadsheet_batch = gc.open_by_key(os.getenv("GOOGLE_SHEET_BATCH_ID"))
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\client.py", line 168, in open_by_key
+    spreadsheet = Spreadsheet(self.http_client, {"id": key})
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\spreadsheet.py", line 29, in __init__
+    metadata = self.fetch_sheet_metadata()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\spreadsheet.py", line 230, in fetch_sheet_metadata
+    return self.client.fetch_sheet_metadata(self.id, params=params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\http_client.py", line 305, in fetch_sheet_metadata
+    r = self.request("get", url, params=params)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\gspread\http_client.py", line 114, in request
+    response = self.session.request(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\transport\requests.py", line 535, in request
+    self.credentials.before_request(auth_request, method, url, request_headers)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\credentials.py", line 239, in before_request
+    self._blocking_refresh(request)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\auth\credentials.py", line 202, in _blocking_refresh
+    self.refresh(request)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\service_account.py", line 448, in refresh
+    access_token, expiry, _ = _client.jwt_grant(
+                              ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 299, in jwt_grant
+    response_data = _token_endpoint_request(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 270, in _token_endpoint_request
+    _handle_error_response(response_data, retryable_error)
+  File "C:\Users\vlad\Desktop\Parser_project\VisaScraper\visascraper\.venv\Lib\site-packages\google\oauth2\_client.py", line 69, in _handle_error_response
+    raise exceptions.RefreshError(
+google.auth.exceptions.RefreshError: ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+2025-06-30 16:53:53,699 - ERROR - [main] Ошибка в основном потоке (попытка 5/5): ('invalid_grant: Invalid JWT Signature.', {'error': 'invalid_grant', 'error_description': 'Invalid JWT Signature.'})
+2025-06-30 16:53:53,699 - CRITICAL - [main] Превышено количество попыток. Перезапуск программы через 60 секунд...
