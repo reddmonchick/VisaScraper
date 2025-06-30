@@ -27,12 +27,13 @@ import threading
 import asyncio
 import time
 import json
+import signal
+import sys
 load_dotenv()
 
 # Подключение роутера
 dp = Dispatcher(storage=MemoryStorage())
 dp.include_router(bot_router)
-
 error_counter = 0
 MAX_ERRORS_BEFORE_RESTART = 5
 
@@ -43,6 +44,16 @@ session = requests.Session()
 cached_batch_application_data = []
 cached_manager_data = []
 cached_stay_permit_data = []
+
+def shutdown_handler(signal, frame):
+    logging.info("Получен сигнал завершения. Останавливаем планировщики...")
+    if scheduler_jobs:
+        scheduler_jobs.shutdown()
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, shutdown_handler)
+signal.signal(signal.SIGTERM, shutdown_handler)
+
 
 def download_pdf(session_id: str, pdf_url: str) -> bytes | None:
     cookies = {'PHPSESSID': session_id}
@@ -549,27 +560,32 @@ def start_parser_scheduler():
 async def run_bot():
     await dp.start_polling(bot)
 
-# === Основная функция ===
+
 def main():
     global error_counter
     init_db()
 
-    # Запуск бота
-    bot_thread = threading.Thread(target=lambda: asyncio.run(run_bot()))
-    bot_thread.start()
+    # Переменная для отслеживания успешного старта
+    started = False
 
-    while True:
+    while not started:
         try:
+            # Запуск бота в отдельном потоке
+
+            # Парсинг и планировщики
             logging.info("Запуск начального парсинга...")
             job_first_two()
             job_others()
             start_parser_scheduler()
             start_notification_scheduler()
             logging.info("Основной поток работает")
-            break
+            started = True
+            error_counter = 0  # Сброс счётчика после успешного запуска
         except Exception as e:
             error_counter += 1
-            logging.error(f"Ошибка в основном потоке (попытка {error_counter}/{MAX_ERRORS_BEFORE_RESTART}): {e}")
+            logging.error(f"Ошибка при запуске (попытка {error_counter}/{MAX_ERRORS_BEFORE_RESTART}): {e}")
+            if scheduler_jobs:
+                scheduler_jobs.shutdown()
             if error_counter >= MAX_ERRORS_BEFORE_RESTART:
                 logging.critical("Превышено количество попыток. Перезапуск программы через 60 секунд...")
                 time.sleep(60)
@@ -579,6 +595,16 @@ def main():
                 time.sleep(30)
 
 
+async def run_all():
+    # Запускаем main в отдельном потоке
+    parser_thread = threading.Thread(target=main)
+    parser_thread.start()
+
+    # Ждём, пока main инициализирует планировщики и запустит парсинг
+    await asyncio.sleep(5)
+
+    # Запускаем бота
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(run_all())

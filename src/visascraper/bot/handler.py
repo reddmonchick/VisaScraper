@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from database.db import SessionLocal
 from database.models import User
-from database.crud import search_by_passport
+from database.crud import search_by_passport, search_by_stay_permit
 
 load_dotenv()
 
@@ -42,7 +42,7 @@ def is_authorized(db: Session, telegram_id: str) -> bool:
 # === Клавиатуры ===
 def main_menu():
     kb = [
-        [InlineKeyboardButton(text="🔍 Найти статус визы", callback_data="search_passport")],
+        [InlineKeyboardButton(text="🔍 Нажми чтобы узнать готовность визы", callback_data="search_passport")],
         [InlineKeyboardButton(text="🏠 Найти место жительства", callback_data="search_stay_permit")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=kb)
