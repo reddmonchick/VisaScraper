@@ -1,4 +1,6 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
+from utils.logger import logger
 from .models import User, BatchApplication, StayPermit
 from typing import Optional
 import re
@@ -42,7 +44,7 @@ def is_batch_exists(db: Session, batch_no: str) -> bool:
 
 
 def is_stay_permit_exists(db: Session, stay_id: str) -> bool:
-    return db.query(StayPermit).filter(StayPermit.id == stay_id).first() is not None
+    return db.query(StayPermit).filter(StayPermit.reg_number == stay_id).first() is not None
 
 def get_user_by_telegram_id(db: Session, telegram_id: str):
     return db.query(User).filter(User.telegram_id == telegram_id).first()
@@ -65,72 +67,89 @@ def delete_user(db: Session):
     db.query(User).delete()
     db.commit()
 
+
 def search_by_passport(db: Session, search_input: str):
-    # Убираем лишние пробелы
     search_input = search_input.strip()
+    logger.info(f"Входной запрос для поиска по паспорту: '{search_input}'")
 
-    # Ищем паспортный номер (последовательность цифр)
-    passport_match = re.search(r'\b\d+\b', search_input)
+    # Ищем ПЕРВУЮ последовательность, содержащую хотя бы одну цифру — скорее всего это номер паспорта
+    passport_match = re.search(r'\b(?=\w*\d)[A-Z0-9-]{5,}\b', search_input)
+
     passport_number = passport_match.group(0) if passport_match else None
+    logger.info(f"Извлеченный номер паспорта: '{passport_number}'")
 
-    # Оставляем только часть без номера паспорта для имени
+    # Убираем номер паспорта из строки, чтобы осталось только имя
     if passport_number:
         name_part = re.sub(r'\b' + re.escape(passport_number) + r'\b\s*', '', search_input).strip()
     else:
         name_part = search_input
+    logger.info(f"Извлеченная часть имени: '{name_part}'")
 
-    # Разделяем на части имени, удаляем дубли и пустые значения
+    # Разделяем имя на части
     name_parts = list(set(filter(None, re.split(r'\s+', name_part.upper()))))
+    logger.info(f"Части имени: {name_parts}")
 
     # Формируем SQL-запрос
     query = db.query(BatchApplication)
 
-    # Фильтруем по full_name (любой порядок слов, игнор регистра), если есть части имени
+    # Фильтруем по имени, если есть части имени
     if name_parts:
-        for part in name_parts:
-            query = query.filter(BatchApplication.full_name.ilike(f"%{part}%"))
-
+        name_filters = [BatchApplication.full_name.ilike(f"%{part}%") for part in name_parts]
+        query = query.filter(or_(*name_filters))
+    
     # Фильтруем по номеру паспорта, если он есть
     if passport_number:
-        query = query.filter(BatchApplication.passport_number == passport_number)
+        query = query.filter(or_(
+            BatchApplication.passport_number == passport_number,
+            BatchApplication.passport_number.ilike(f"%{passport_number}%")
+        ))
 
     results = query.all()
+    logger.info(f"Найдено записей: {len(results)}")
+    for result in results:
+        logger.info(f"Результат: {result.__dict__}")
+    
     return results
 
 def search_by_stay_permit(db: Session, search_input: str):
     search_input = search_input.strip()
-    passport_match = re.search(r'\b\d+\b', search_input)
-    passport_number = passport_match.group(0) if passport_match else None
+    logger.info(f"Входной запрос для поиска по месту жительства: '{search_input}'")
 
+    # Ищем ПЕРВУЮ последовательность, содержащую хотя бы одну цифру — скорее всего это номер паспорта
+    passport_match = re.search(r'\b(?=\w*\d)[A-Z0-9-]{5,}\b', search_input)
+
+    passport_number = passport_match.group(0) if passport_match else None
+    logger.info(f"Извлеченный номер паспорта: '{passport_number}'")
+
+    # Убираем номер паспорта из строки, чтобы осталось только имя
     if passport_number:
         name_part = re.sub(r'\b' + re.escape(passport_number) + r'\b\s*', '', search_input).strip()
     else:
         name_part = search_input
+    logger.info(f"Извлеченная часть имени: '{name_part}'")
 
+    # Разделяем имя на части
     name_parts = list(set(filter(None, re.split(r'\s+', name_part.upper()))))
+    logger.info(f"Части имени: {name_parts}")
 
+    # Формируем SQL-запрос
     query = db.query(StayPermit)
 
+    # Фильтруем по имени, если есть части имени
     if name_parts:
-        for part in name_parts:
-            query = query.filter(StayPermit.name.ilike(f"%{part}%"))
-
+        name_filters = [StayPermit.name.ilike(f"%{part}%") for part in name_parts]
+        query = query.filter(or_(*name_filters))
+    
+    # Фильтруем по номеру паспорта, если он есть
     if passport_number:
-        query = query.filter(StayPermit.passport_number == passport_number)
+        query = query.filter(or_(
+            StayPermit.passport_number == passport_number,
+            StayPermit.passport_number.ilike(f"%{passport_number}%")
+        ))
 
     results = query.all()
+    logger.info(f"Найдено записей: {len(results)}")
+    for result in results:
+        logger.info(f"Результат: {result.__dict__}")
+    
     return results
-
-def get_user_by_telegram_id(db: Session, telegram_id: str):
-    return db.query(User).filter(User.telegram_id == telegram_id).first()
-
-def create_or_update_user(db: Session, telegram_id: str, password: str):
-    user = db.query(User).filter(User.telegram_id == telegram_id).first()
-    if not user:
-        user = User(telegram_id=telegram_id, password=password)
-        db.add(user)
-    else:
-        user.password = password
-    db.commit()
-    db.refresh(user)
-    return user

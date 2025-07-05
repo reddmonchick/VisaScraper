@@ -6,7 +6,7 @@ from utils.driver_uploader import upload_to_drive
 from utils.logger import logger as logging
 from utils.parser import safe_get, extract_status_batch, extract_status, extract_action_link, extract_reg_number, extract_visa, extract_detail
 from bot.bot import dp, bot
-from bot.handler import router as bot_router
+from bot.handler import bot_router
 from utils.scheduler import start_scheduler as start_notification_scheduler
 from database.crud import save_batch_data, save_stay_permit_data
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -314,7 +314,7 @@ def fetch_and_update_stay(name, session_id):
                 temp_counter = 0
 
                 for res in result:
-                    reg_number = res.get('register_number')
+                    reg_number = res.get('register_number').split("'>")[-1].split("</a>")[0]
                     full_name = res.get('full_name', '')
                     type_permit = res.get('type_of_staypermit', '')
                     type_visa = res.get('type_of_visa', '')
@@ -365,7 +365,7 @@ def fetch_and_update_stay(name, session_id):
 
                     client_data.append([
                         full_name, type_permit, type_visa, start_date, issue_data,
-                        expired_data, status, action_result, name
+                        expired_data, status, action_result,passport_number, name
                     ])
                     client_write_data.append({
                         'reg_number': reg_number,
@@ -374,8 +374,8 @@ def fetch_and_update_stay(name, session_id):
                         "visa_type": type_visa,
                         "passport_number": passport_number,
                         "arrival_date": start_date,
-                        "issue_data": issue_data,
-                        "expired_data": expired_data,
+                        "issue_date": issue_data,
+                        "expired_date": expired_data,
                         "status": status,
                         "action_link": action_result,
                         "account": name
@@ -446,42 +446,56 @@ def write_to_sheet(gc, spreadsheet_key, batch_app_data, manager_data, stay_data)
         gc = gspread.service_account_from_dict(credentials)
         spreadsheet = gc.open_by_key(spreadsheet_key)
 
-        # Batch Application
-        worksheet = spreadsheet.worksheet('Batch Application')
+        worksheet_batch = spreadsheet.worksheet('Batch Application')
         worksheet_manager = spreadsheet.worksheet('Batch Application(Manager)')
         worksheet_stay = spreadsheet.worksheet('StayPermit')
 
-        worksheet.clear()
+        # Получаем список аккаунтов, которые относятся к job_first_two
+        first_two_accounts = [row[10] for row in batch_app_data]  # Account находится в 10-м столбце
+        first_two_accounts = list(set(first_two_accounts))  # Уникальные аккаунты
+
+        # --- Batch Application ---
+        # Получаем все данные
+        all_batch_data = worksheet_batch.get_all_values()
+        header = all_batch_data[0]
+        existing_data = all_batch_data[1:]
+
+        # Фильтруем существующие данные, удаляя старые данные по первым двум аккаунтам
+        filtered_data = [
+            row for row in existing_data if row[10] not in first_two_accounts
+        ]
+
+        # Добавляем новые данные
+        updated_batch_data = [header] + filtered_data + batch_app_data
+
+        # Перезаписываем
+        worksheet_batch.clear()
+        worksheet_batch.append_rows(updated_batch_data)
+
+        # --- Manager Worksheet ---
+        all_mgr_data = worksheet_manager.get_all_values()
+        existing_mgr_data = all_mgr_data[1:]
+        filtered_mgr_data = [
+            row for row in existing_mgr_data if row[5] not in first_two_accounts
+        ]
+        updated_mgr_data = [all_mgr_data[0]] + filtered_mgr_data + manager_data
         worksheet_manager.clear()
+        worksheet_manager.append_rows(updated_mgr_data)
+
+        # --- Stay Permit ---
+        all_stay_data = worksheet_stay.get_all_values()
+        existing_stay_data = all_stay_data[1:]
+        filtered_stay_data = [
+            row for row in existing_stay_data if row[9] not in first_two_accounts
+        ]
+        updated_stay_data = [all_stay_data[0]] + filtered_stay_data + stay_data
         worksheet_stay.clear()
+        worksheet_stay.append_rows(updated_stay_data)
 
-        # Заголовки
-        worksheet.append_row([
-            "Batch No", "Register Number", "Full Name", "Date of Birth",
-            "Visitor Visa Number", "Passport Number", "Payment Date",
-            "Visa Type", "Status", "Action Link", "Account"
-        ])
-        worksheet_manager.append_row([
-            "Full Name", "Visa Type", "Payment Date", "Status", "Action Link", "Account"
-        ])
-        worksheet_stay.append_row([
-            "Name", "Type of Stypermit", "Visa type", "Arrival date",
-            "Issue date", "Expired data", "Status", "Action Link", "Account"
-        ])
-
-        # Данные
-        if batch_app_data:
-            worksheet.append_rows(batch_app_data)
-        if manager_data:
-            worksheet_manager.append_rows(manager_data)
-        if stay_data:
-            worksheet_stay.append_rows(stay_data)
-
-        logging.info("✅ Все данные успешно записаны в Google Sheets")
+        logging.info("✅ Все данные успешно обновлены в Google Sheets")
 
     except Exception as e:
         logging.error(f"❌ Ошибка при записи в Google Sheets: {e}")
-
 
 def job_first_two():
     global cached_batch_application_data, cached_manager_data, cached_stay_permit_data
@@ -547,18 +561,14 @@ def job_others():
 # === Функция запуска планировщика ===
 scheduler_jobs = None  # Для APScheduler парсинга
 
-
 def start_parser_scheduler():
     global scheduler_jobs
     scheduler_jobs = BackgroundScheduler(timezone=ZoneInfo("Europe/Moscow"),
-                                         executors={'default': ThreadPoolExecutor(1)})
-    scheduler_jobs.add_job(job_first_two, 'interval', minutes=10)
-    scheduler_jobs.add_job(job_others,'cron', hour=7, minute=0)
+                                         executors={'default': ThreadPoolExecutor(2)})
+    scheduler_jobs.add_job(job_first_two, 'interval', minutes=10,coalesce=True,misfire_grace_time=60 * 5)
+    scheduler_jobs.add_job(job_others,'cron', hour=7, minute=0,coalesce=True,misfire_grace_time=60 * 5)
     scheduler_jobs.start()
     logging.info("Планировщик парсинга запущен")
-
-async def run_bot():
-    await dp.start_polling(bot)
 
 
 def main():
@@ -577,7 +587,6 @@ def main():
             job_first_two()
             job_others()
             start_parser_scheduler()
-            start_notification_scheduler()
             logging.info("Основной поток работает")
             started = True
             error_counter = 0  # Сброс счётчика после успешного запуска
@@ -604,6 +613,7 @@ async def run_all():
     await asyncio.sleep(5)
 
     # Запускаем бота
+    await start_notification_scheduler()  # запуск асинхронного планировщика
     await dp.start_polling(bot)
 
 if __name__ == "__main__":

@@ -3,6 +3,9 @@ from datetime import date, timedelta
 import os
 from database.db import SessionLocal
 from database.models import BatchApplication, StayPermit
+from sqlalchemy import func
+from aiogram.exceptions import TelegramRetryAfter
+import asyncio
 
 # === Инициализация бота ===
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -11,12 +14,22 @@ bot = Bot(token=BOT_TOKEN)
 
 
 # === Асинхронная отправка сообщения ===
+DELAY_BETWEEN_MESSAGES = 1  # 1 секунда между сообщениями
+
 async def send_telegram_message(text: str):
+    bot = Bot(token=os.getenv("TELEGRAM_BOT_TOKEN"))
     try:
-        await bot.send_message(chat_id=CHANNEL_ID, text=text)
+        await bot.send_message(chat_id=os.getenv("TELEGRAM_CHANNEL_ID"), text=text)
         print("✅ Сообщение отправлено в Telegram")
+        await asyncio.sleep(DELAY_BETWEEN_MESSAGES)  # Задержка после успешной отправки
+    except TelegramRetryAfter as e:
+        print(f"⚠️ Слишком много запросов. Ждём {e.retry_after} секунд...")
+        await asyncio.sleep(e.retry_after)
+        await send_telegram_message(text)  # Повторяем отправку после ожидания
     except Exception as e:
         print(f"❌ Ошибка при отправке сообщения: {e}")
+    finally:
+        await bot.session.close()
 
 
 # === 1. Уведомление о статусе "Approved" ===
@@ -75,19 +88,21 @@ async def check_birthdays():
 async def check_visa_expirations():
     db = SessionLocal()
     today = date.today()
-    threshold = today + timedelta(days=30)  # За 30 дней до истечения
+    target_date = (today + timedelta(days=20)).strftime("%Y-%m-%d")
     print('Запустили крон: check_visa_expirations')
+
     try:
         users = db.query(StayPermit).filter(
             StayPermit.expired_date.is_not(None),
-            StayPermit.expired_date == threshold.strftime("%d/%m/%Y")
+            StayPermit.expired_date == target_date
         ).all()
 
         for user in users:
             text = (
-                f"⚠️ ВНИМАНИЕ: У пользователя {user.name} виза заканчивается через 30 дней!\n"
+                f"⚠️ ВНИМАНИЕ: У пользователя c номером паспорта {user.passport_number} виза заканчивается через 20 дней!\n"
                 f"Дата окончания: {user.expired_date}\n"
-                f"Тип визы: {user.type_of_staypermit}"
+                f"Тип визы: {user.type_of_staypermit}\n"
+                f"Ссылка: {user.action_link}"
             )
             await send_telegram_message(text)
     except Exception as e:
