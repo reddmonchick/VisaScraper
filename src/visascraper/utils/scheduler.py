@@ -19,7 +19,7 @@ async def start_scheduler():
     #scheduler.add_job(run_async(check_birthdays), 'cron', hour=4, minute=0)
     #scheduler.add_job(run_async(check_visa_expirations), 'cron', hour=10, minute=0)
 
-    scheduler.add_job(check_birthdays, 'cron', hour=4, minute=0, coalesce=True, misfire_grace_time=60 * 5)
+    scheduler.add_job(check_birthdays, 'cron', hour=5, minute=0, coalesce=True, misfire_grace_time=60 * 5)
     scheduler.add_job(check_visa_expirations, 'cron',hour=5, minute=0, coalesce=True, misfire_grace_time=60 * 5)
 
     scheduler.start()
