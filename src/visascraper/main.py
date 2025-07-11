@@ -20,6 +20,9 @@ from dotenv import load_dotenv
 from curl_cffi import requests
 from bs4 import BeautifulSoup
 from zoneinfo import ZoneInfo
+
+from traceback import format_exc
+
 # Загрузка переменных из .env
 import os
 import sys
