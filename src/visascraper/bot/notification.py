@@ -88,7 +88,9 @@ async def check_birthdays():
 async def check_visa_expirations():
     db = SessionLocal()
     today = date.today()
-    target_date = (today + timedelta(days=20)).strftime("%Y-%m-%d")
+    target_date = (today + timedelta(days=40)).strftime("%Y-%m-%d")
+    two_target_date = (today + timedelta(days=5)).strftime("%Y-%m-%d")
+
     print('Запустили крон: check_visa_expirations')
 
     try:
@@ -99,7 +101,21 @@ async def check_visa_expirations():
 
         for user in users:
             text = (
-                f"⚠️ ВНИМАНИЕ: У пользователя c номером паспорта {user.passport_number} виза заканчивается через 20 дней!\n"
+                f"⚠️ ВНИМАНИЕ: У пользователя c номером паспорта {user.passport_number} виза заканчивается через 40 дней!\n"
+                f"Дата окончания: {user.expired_date}\n"
+                f"Тип визы: {user.type_of_staypermit}\n"
+                f"Ссылка: {user.action_link}"
+            )
+            await send_telegram_message(text)
+
+        users = db.query(StayPermit).filter(
+            StayPermit.expired_date.is_not(None),
+            StayPermit.expired_date == two_target_date
+        ).all()
+
+        for user in users:
+            text = (
+                f"⚠️ ВНИМАНИЕ: У пользователя c номером паспорта {user.passport_number} виза заканчивается через 5 дней!\n"
                 f"Дата окончания: {user.expired_date}\n"
                 f"Тип визы: {user.type_of_staypermit}\n"
                 f"Ссылка: {user.action_link}"

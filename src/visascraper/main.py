@@ -426,8 +426,8 @@ def parse_accounts(account_names, account_passwords):
                     session_id = login(name, password)
                     if not session_id:
                         continue
-                batch_app, batch_mgr = fetch_and_update_batch(name, session_id)
                 stay_data = fetch_and_update_stay(name, session_id)
+                batch_app, batch_mgr = fetch_and_update_batch(name, session_id)
                 batch_app_table.extend(batch_app)
                 batch_mgr_table.extend(batch_mgr)
                 stay_data_table.extend(stay_data)
@@ -613,11 +613,11 @@ async def run_all():
     parser_thread.start()
 
     # Ждём, пока main инициализирует планировщики и запустит парсинг
-    await asyncio.sleep(5)
+    #await asyncio.sleep(5)
 
     # Запускаем бота
-    await start_notification_scheduler()  # запуск асинхронного планировщика
-    await dp.start_polling(bot)
+    #await start_notification_scheduler()  # запуск асинхронного планировщика
+    #await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(run_all())
