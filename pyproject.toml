@@ -21,7 +21,9 @@ dependencies = [
     "python-dotenv (>=1.1.0,<2.0.0)",
     "apscheduler (>=3.11.0,<4.0.0)",
     "aiogram (>=3.20.0.post0,<4.0.0)",
-    "tls-client (>=1.0.1,<2.0.0)"
+    "tls-client (>=1.0.1,<2.0.0)",
+    "mega (>=0.2.11,<0.3.0)",
+    "yadisk (>=3.4.0,<4.0.0)"
 ]
 
 [tool.poetry]

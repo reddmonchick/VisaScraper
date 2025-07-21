@@ -2,7 +2,7 @@ from database.db import init_db
 from database.models import BatchApplication, StayPermit
 from infrasctructure.google_sheets import setup_google_sheet, prepare_worksheet
 from session_manager import login, check_session, load_session, save_value
-from utils.driver_uploader import upload_to_drive
+from utils.driver_uploader import upload_to_yandex_disk
 from utils.logger import logger as logging
 from utils.parser import safe_get, extract_status_batch, extract_status, extract_action_link, extract_reg_number, extract_visa, extract_detail
 from bot.bot import dp, bot
@@ -354,9 +354,9 @@ def fetch_and_update_stay(name, session_id):
                                 with open(temp_path, "rb") as f:
                                     pdf_content = f.read()
 
-                                # Загружаем на Google Drive
+                                # Загружаем на Google Drivef
                                 temp_counter += 1
-                                public_link = upload_to_drive(pdf_content, f"{reg_number}_stay_permit.pdf")
+                                public_link = upload_to_yandex_disk(pdf_content, f"{reg_number}_stay_permit.pdf")
                                 action_result = public_link
                                 if temp_counter % 10 == 0:
                                     logging.info(f'Скачали и вставили {temp_counter} ссылок(Stay Permit)')
