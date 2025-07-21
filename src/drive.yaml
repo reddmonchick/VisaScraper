@@ -1,3 +1,0 @@
-client_config_backend: service
-service_config:
-  client_json_file_path: "src/drive_account.json"
