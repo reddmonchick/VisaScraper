@@ -613,11 +613,11 @@ async def run_all():
     parser_thread.start()
 
     # Ждём, пока main инициализирует планировщики и запустит парсинг
-    #await asyncio.sleep(5)
+    await asyncio.sleep(5)
 
     # Запускаем бота
-    #await start_notification_scheduler()  # запуск асинхронного планировщика
-    #await dp.start_polling(bot)
+    await start_notification_scheduler()  # запуск асинхронного планировщика
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(run_all())
