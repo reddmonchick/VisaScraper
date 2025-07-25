@@ -1,8 +1,8 @@
 from bs4 import BeautifulSoup
 
-def safe_get(data: dict, key: str) -> str:
+def safe_get(data: dict, key: str, default='') -> str:
     """Безопасно извлекает значение из словаря. Возвращает пустую строку, если ключ отсутствует или значение None."""
-    return data.get(key, '')
+    return data.get(key, default)
 
 def extract_status_batch(html_content: str) -> str:
     """Извлекает текст статуса из HTML-контента (для Batch Application)"""
@@ -30,14 +30,15 @@ def extract_status(html_content: str) -> str:
 
 def extract_action_link(html_content: str) -> str:
     """Извлекает ссылку из action-HTML, добавляя базовый URL, если ссылка найдена."""
-    base_url = "https://evisa.imigrasi.go.id" 
+    #base_url = "https://evisa.imigrasi.go.id" 
     if not html_content:
         return ''
     try:
         soup = BeautifulSoup(html_content, 'lxml')
         action_link = soup.find('a', class_='btn btn-sm btn-outline-info')
         if action_link and action_link.has_attr('href'):
-            return f"{base_url}{action_link['href']}"
+            #return f"{base_url}{action_link['href']}"
+            return action_link['href']
         return ''
     except Exception as e:
         print(f"Error extracting action link: {e}")

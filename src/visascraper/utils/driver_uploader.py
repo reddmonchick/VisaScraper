@@ -96,3 +96,21 @@ def upload_to_yandex_disk(pdf_content: bytes, filename: str) -> str:
         raise Exception(f"Ошибка при загрузке файла: {str(e)}")
     finally:
         pass
+
+def download_pdf(session_id: str, pdf_url: str) -> bytes | None:
+    """Скачивает PDF по ссылке, используя сессию."""
+    cookies = {'PHPSESSID': session_id}
+    headers = {
+        'User-Agent': 'Mozilla/5.0',
+        'Referer': 'https://evisa.imigrasi.go.id/ ',
+    }
+    try:
+        response = session.get(pdf_url, cookies=cookies, headers=headers)
+        if response.status_code == 200 and 'application/pdf' in response.headers.get('Content-Type', ''):
+            return response.content
+        else:
+            logging.error(f"Ошибка загрузки PDF: {response.status_code}, Content-Type: {response.headers.get('Content-Type')}")
+            return None
+    except Exception as e:
+        logging.error(f"Ошибка при загрузке PDF: {e}")
+        return None
