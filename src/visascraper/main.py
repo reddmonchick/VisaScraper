@@ -1,4 +1,4 @@
-# main.py
+
 """
 Основной скрипт для парсинга данных с evisa.imigrasi.go.id,
 сохранения их в БД и записи в Google Sheets.
@@ -24,25 +24,22 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.executors.pool import ThreadPoolExecutor
 from curl_cffi import requests
 from bs4 import BeautifulSoup
-import yadisk # Предполагается, что используется yadisk
+import yadisk 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
 # === Импорты внутренних модулей ===
-# Убедитесь, что пути к импортам корректны для вашей структуры проекта
 from database.db import init_db, SessionLocal
 from database.models import BatchApplication, StayPermit
 from database.crud import save_batch_data, save_stay_permit_data
-# from infrasctructure.google_sheets import setup_google_sheet, prepare_worksheet # Не используются напрямую
-from session_manager import login, check_session, load_session # save_value не используется?
-from utils.driver_uploader import upload_to_yandex_disk, download_pdf # Убедитесь, что download_pdf там тоже есть
-from utils.logger import logger as custom_logger # Используем ваш логгер
+from session_manager import login, check_session, load_session 
+from utils.driver_uploader import upload_to_yandex_disk, download_pdf 
+from utils.logger import logger as custom_logger # Используем логгер
 from utils.parser import (
     safe_get, extract_status_batch, extract_status,
     extract_action_link as extract_action_link_parser, # Переименовано во избежание конфликта
     extract_reg_number, extract_visa, extract_detail
 )
-# from bot.bot import dp, bot # Инициализируются внутри класса BotRunner
 from bot.handler import bot_router
 from utils.scheduler import start_scheduler as start_notification_scheduler
 
@@ -70,7 +67,7 @@ IDX_SP_ACTION_LINK = 7 # Индекс столбца 'action_link' в stay_data
 
 PAYMENT_DATE_FORMAT = "%d-%m-%Y" # Формат даты в строке, например, '28-03-2025'
 SP_TEMP_DIR = "src/temp"
-os.makedirs(SP_TEMP_DIR, exist_ok=True) # Создаем директорию заранее
+os.makedirs(SP_TEMP_DIR, exist_ok=True) 
 
 # === Глобальные переменные ===
 scheduler_jobs: Optional[BackgroundScheduler] = None
