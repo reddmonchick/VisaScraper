@@ -15,7 +15,7 @@ def run_async(func):
 async def start_scheduler():
     scheduler = AsyncIOScheduler(timezone=ZoneInfo("Europe/Moscow"))
 
-    scheduler.add_job(notify_approved_users, 'interval', minutes=10, coalesce=True, misfire_grace_time=60 * 5)
+    scheduler.add_job(notify_approved_users, 'interval', minutes=1, coalesce=True, misfire_grace_time=60 * 5)
     #scheduler.add_job(run_async(check_birthdays), 'cron', hour=4, minute=0)
     #scheduler.add_job(run_async(check_visa_expirations), 'cron', hour=10, minute=0)
 
