@@ -324,12 +324,12 @@ class DataParser:
     def _parse_date_for_sorting(self, date_str: str) -> date:
         """Преобразует строку даты в datetime.date для сортировки."""
         if not date_str:
-            return date.max
+            return date.min
         try:
             return datetime.strptime(date_str, PAYMENT_DATE_FORMAT).date()
         except ValueError:
             custom_logger.warning(f"Не удалось преобразовать дату '{date_str}' для сортировки.")
-            return date.max
+            return date.min
 
     def fetch_and_update_batch(self, name: str, session_id: str) -> Tuple[List[List[str]], List[List[str]]]:
         """Парсит данные Batch Application для аккаунта."""
