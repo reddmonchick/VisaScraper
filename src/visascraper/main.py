@@ -414,7 +414,7 @@ class DataParser:
                                 full_name=full_name,
                                 visitor_visa_number=visitor_visa_number,
                                 passport_number=passport_number,
-                                payment_date=payment_date,
+                                payment_date='' if payment_date.strip() == '-' else payment_date ,
                                 visa_type=visa_type,
                                 status=status,
                                 action_link='', # Будет заполнено позже
@@ -652,12 +652,12 @@ class GoogleSheetsManager:
     def _parse_date_for_sorting(self, date_str: str) -> date:
         """Преобразует строку даты 'DD-MM-YYYY' в datetime.date для сортировки."""
         if not date_str:
-            return date.max # Помещаем пустые даты в конец
+            return date.min # Помещаем пустые даты в конец
         try:
             return datetime.strptime(date_str, PAYMENT_DATE_FORMAT).date()
         except ValueError:
             custom_logger.warning(f"Не удалось преобразовать дату '{date_str}' для сортировки.")
-            return date.max
+            return date.min
 
     def write_to_sheet(self,
         spreadsheet_key: str,
