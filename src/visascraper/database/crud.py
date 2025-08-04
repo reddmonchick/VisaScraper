@@ -23,19 +23,75 @@ def get_db():
     finally:
         db.close()
 
-def save_batch_data(db: Session, data_list: list):
-    for item in data_list:
-        batch_no = item.get("batch_no")
-        if not is_batch_exists(db, batch_no):
-            db.execute(BatchApplication.__table__.insert(), [item])
+def save_or_update_batch_data(db: Session, data_list: list):
+    """
+    Сохраняет новые заявления BatchApplication или обновляет существующие.
+    Корректно обрабатывает last_status для отслеживания изменений.
+    """
+    for item_data in data_list:
+        reg_number = item_data.get("register_number")
+        if not reg_number:
+            continue
+
+        existing_app = db.query(BatchApplication).filter(BatchApplication.register_number == reg_number).first()
+
+        if existing_app:
+            # --- ОБНОВЛЕНИЕ ---
+            new_status = item_data.get("status")
+            if existing_app.status != new_status:
+                existing_app.last_status = existing_app.status
+                existing_app.status = new_status
+            
+            # Обновляем остальные поля
+            existing_app.full_name = item_data.get("full_name")
+            existing_app.batch_no = item_data.get("batch_no")
+            existing_app.register_number = item_data.get("register_number")
+            existing_app.visitor_visa_number = item_data.get('')
+            existing_app.passport_number = item_data.get("passport_number")
+            existing_app.payment_date = item_data.get("payment_date")
+            existing_app.visa_type = item_data.get("visa_type")
+            existing_app.action_link = item_data.get("action_link")
+            existing_app.account = item_data.get("account")
+            existing_app.birth_date = item_data.get("birth_date")
+            # ... и так далее для всех полей ...
+        else:
+            # --- СОЗДАНИЕ ---
+            new_app = BatchApplication(**item_data)
+            new_app.last_status = item_data.get("status")
+            db.add(new_app)
     db.commit()
 
 
-def save_stay_permit_data(db: Session, data_list: list):
-    for item in data_list:
-        stay_id = item.get("reg_number")
-        if not is_stay_permit_exists(db, stay_id):
-            db.execute(StayPermit.__table__.insert(), [item])
+# --- НОВАЯ ФУНКЦИЯ ДЛЯ STAY PERMIT ---
+def save_or_update_stay_permit_data(db: Session, data_list: list):
+    """
+    Сохраняет новые разрешения на пребывание или обновляет существующие.
+    """
+    for item_data in data_list:
+        reg_number = item_data.get("reg_number")
+        if not reg_number:
+            continue
+
+        existing_permit = db.query(StayPermit).filter(StayPermit.reg_number == reg_number).first()
+
+        if existing_permit:
+            # --- ОБНОВЛЕНИЕ ---
+            existing_permit.reg_number = item_data.get("reg_number")
+            existing_permit.name = item_data.get("name")
+            existing_permit.type_of_staypermit = item_data.get("type_of_staypermit")
+            existing_permit.visa_type = item_data.get("visa_type")
+            existing_permit.passport_number = item_data.get("passport_number")
+            existing_permit.arrival_date = item_data.get("arrival_date")
+            existing_permit.issue_date = item_data.get("issue_date")
+            existing_permit.expired_date = item_data.get("expired_date")
+            existing_permit.status = item_data.get("status")
+            existing_permit.action_link = item_data.get("action_link")
+            existing_permit.account = item_data.get("account")
+            # ... и так далее для всех полей ...
+        else:
+            # --- СОЗДАНИЕ ---
+            new_permit = StayPermit(**item_data)
+            db.add(new_permit)
     db.commit()
 
 

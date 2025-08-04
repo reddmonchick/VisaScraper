@@ -31,7 +31,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 # === Импорты внутренних модулей ===
 from database.db import init_db, SessionLocal
 from database.models import BatchApplication, StayPermit
-from database.crud import save_batch_data, save_stay_permit_data
+from database.crud import save_or_update_batch_data, save_or_update_stay_permit_data
 from session_manager import login, check_session, load_session 
 from utils.driver_uploader import upload_to_yandex_disk, download_pdf 
 from utils.logger import logger as custom_logger # Используем логгер
@@ -113,7 +113,7 @@ class BatchApplicationData:
 class StayPermitData:
     """Класс для представления распарсенных данных Stay Permit."""
     reg_number: str
-    full_name: str
+    name: str
     type_of_staypermit: str
     visa_type: str
     passport_number: str
@@ -127,7 +127,7 @@ class StayPermitData:
     def to_sheet_row(self) -> list:
         """Преобразует объект в список для записи в Google Sheets (Stay Permit)."""
         return [
-            self.full_name, self.type_of_staypermit, self.visa_type,
+            self.name, self.type_of_staypermit, self.visa_type,
             self.arrival_date, self.issue_date, self.expired_date,
             self.status, self.action_link, self.passport_number, self.account
         ]
@@ -445,7 +445,7 @@ class DataParser:
                 # Сохранение в БД
                 db_dicts = [obj.to_db_dict() for obj in parsed_data_list]
                 with SessionLocal() as db:
-                    save_batch_data(db, db_dicts)
+                    save_or_update_batch_data(db, db_dicts)
                     custom_logger.info(f"✅ Данные Batch Application для {name} сохранены в БД (всего {len(db_dicts)} записей)")
 
                 # Подготовка данных для Google Sheets
@@ -540,7 +540,7 @@ class DataParser:
                             # Создаем объект данных
                             stay_obj = StayPermitData(
                                 reg_number=reg_number,
-                                full_name=full_name,
+                                name=full_name,
                                 type_of_staypermit=type_permit,
                                 visa_type=type_visa,
                                 passport_number=passport_number,
@@ -578,7 +578,7 @@ class DataParser:
                 # Сохранение в БД
                 db_dicts = [obj.to_db_dict() for obj in parsed_data_list]
                 with SessionLocal() as db:
-                    save_stay_permit_data(db, db_dicts)
+                    save_or_update_stay_permit_data(db, db_dicts)
                     custom_logger.info(f"✅ Данные Stay Permit для {name} сохранены в БД (всего {len(db_dicts)} записей)")
 
                 # Подготовка данных для Google Sheets
