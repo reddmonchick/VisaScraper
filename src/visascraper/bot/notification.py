@@ -6,6 +6,8 @@ from database.models import BatchApplication, StayPermit
 from sqlalchemy import func
 from aiogram.exceptions import TelegramRetryAfter
 import asyncio
+from aiogram.types import FSInputFile
+
 
 # === Инициализация бота ===
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -16,12 +18,19 @@ bot = Bot(token=BOT_TOKEN)
 # === Асинхронная отправка сообщения ===
 DELAY_BETWEEN_MESSAGES = 1  # 1 секунда между сообщениями
 
-async def send_telegram_message(text: str):
+async def send_telegram_message(text: str, document: FSInputFile = None):
     bot = Bot(token=os.getenv("TELEGRAM_BOT_TOKEN"))
     try:
-        await bot.send_message(chat_id=os.getenv("TELEGRAM_CHANNEL_ID"), text=text)
-        print("✅ Сообщение отправлено в Telegram")
-        await asyncio.sleep(DELAY_BETWEEN_MESSAGES)  # Задержка после успешной отправки
+        if document:
+            await bot.send_document(
+                    chat_id=os.getenv("TELEGRAM_CHANNEL_ID"),
+                    document=document,
+                    caption=text
+                )
+        else:
+            await bot.send_message(chat_id=os.getenv("TELEGRAM_CHANNEL_ID"), text=text)
+            print("✅ Сообщение отправлено в Telegram")
+            await asyncio.sleep(DELAY_BETWEEN_MESSAGES)  # Задержка после успешной отправки
     except TelegramRetryAfter as e:
         print(f"⚠️ Слишком много запросов. Ждём {e.retry_after} секунд...")
         await asyncio.sleep(e.retry_after)
@@ -40,14 +49,18 @@ async def notify_approved_users():
         users = db.query(BatchApplication).all()
         for user in users:
             if user.status == "Approved" and user.last_status != "Approved" and user.last_status != None:
+
+                file_path = f"src/temp/{user.register_number}_batch_application.pdf"
+                document = FSInputFile(file_path)
+
                 text = (
                     f"🎉 Виза одобрена!\n"
                     f"Имя: {user.full_name}\n"
                     f"Статус: {user.status}\n"
                     f"Номер паспорта: {user.passport_number}\n"
-                    f"Ссылка: {user.action_link}"
+                  #  f"Ссылка: {user.action_link}"
                 )
-                await send_telegram_message(text)
+                await send_telegram_message(text, document=document)
                 user.last_status = "Approved"
                 db.commit()
             elif user.status != "Approved" and user.last_status == "Approved":
@@ -100,13 +113,16 @@ async def check_visa_expirations():
         ).all()
 
         for user in users:
+            file_path = f"src/temp/{user.reg_number}_stay_permit.pdf"
+            document = FSInputFile(file_path)
+
             text = (
                 f"⚠️ ВНИМАНИЕ: У пользователя c номером паспорта {user.passport_number} виза заканчивается через 40 дней!\n"
                 f"Дата окончания: {user.expired_date}\n"
                 f"Тип визы: {user.type_of_staypermit}\n"
-                f"Ссылка: {user.action_link}"
+               # f"Ссылка: {user.action_link}"
             )
-            await send_telegram_message(text)
+            await send_telegram_message(text, document)
 
         users = db.query(StayPermit).filter(
             StayPermit.expired_date.is_not(None),
@@ -114,13 +130,16 @@ async def check_visa_expirations():
         ).all()
 
         for user in users:
+            file_path = f"src/temp/{user.reg_number}_stay_permit.pdf"
+            document = FSInputFile(file_path)
+
             text = (
                 f"⚠️ ВНИМАНИЕ: У пользователя c номером паспорта {user.passport_number} виза заканчивается через 5 дней!\n"
                 f"Дата окончания: {user.expired_date}\n"
                 f"Тип визы: {user.type_of_staypermit}\n"
-                f"Ссылка: {user.action_link}"
+               # f"Ссылка: {user.action_link}"
             )
-            await send_telegram_message(text)
+            await send_telegram_message(text, document=document)
     except Exception as e:
         print(f"❌ Ошибка при проверке истечения визы: {e}")
     finally:

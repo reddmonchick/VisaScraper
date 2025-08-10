@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo
 from typing import List, Tuple, Dict, Any, Optional, NamedTuple
 from dataclasses import dataclass, asdict
 
-# === Импорты внешних библиотек ===
+
 import gspread
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.executors.pool import ThreadPoolExecutor
@@ -28,7 +28,7 @@ import yadisk
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
-# === Импорты внутренних модулей ===
+
 from database.db import init_db, SessionLocal
 from database.models import BatchApplication, StayPermit
 from database.crud import save_or_update_batch_data, save_or_update_stay_permit_data
@@ -43,11 +43,11 @@ from utils.parser import (
 from bot.handler import bot_router
 from utils.scheduler import start_scheduler as start_notification_scheduler
 
-# === Конфигурация ===
+
 from dotenv import load_dotenv
 load_dotenv()
 
-# === Константы ===
+
 MAX_ERRORS_BEFORE_RESTART = 5
 RESTART_DELAY_AFTER_ERRORS = 60 # секунд
 RETRY_DELAY_AFTER_ERROR = 30 # секунд
@@ -58,7 +58,7 @@ GS_BATCH_SHEET_ID = os.getenv("GOOGLE_SHEET_BATCH_ID")
 GS_CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_JSON_PATH")
 YANDEX_TOKEN = os.getenv('YANDEX_TOKEN')
 
-# Константы для индексов столбцов в данных (для сортировки и фильтрации)
+
 IDX_BA_ACCOUNT = 10 # Индекс столбца 'account' в client_data_table (Batch)
 IDX_MGR_ACCOUNT = 5  # Индекс столбца 'account' в manager_data (Batch Manager)
 IDX_MGR_PAYMENT_DATE = 2 # Индекс столбца 'payment_date' в manager_data
@@ -69,11 +69,11 @@ PAYMENT_DATE_FORMAT = "%d-%m-%Y" # Формат даты в строке, нап
 SP_TEMP_DIR = "src/temp"
 os.makedirs(SP_TEMP_DIR, exist_ok=True) 
 
-# === Глобальные переменные ===
+
 scheduler_jobs: Optional[BackgroundScheduler] = None
 error_counter = 0
 
-# === Классы данных ===
+
 
 @dataclass
 class BatchApplicationData:
@@ -951,37 +951,29 @@ class Application:
     def run_parsing_cycle(self):
         """Выполняет один цикл парсинга (для инициализации)."""
         custom_logger.info("Запуск начального парсинга...")
-        # --- ИНТЕГРАЦИЯ: Вызов парсинга через JobScheduler ---
-        # Выполняем задачи напрямую, а не через планировщик, для инициализации
+
         self.job_scheduler.job_first_two()
         self.job_scheduler.job_others()
-        # --- КОНЕЦ ИНТЕГРАЦИИ ---
 
     async def run(self):
         """Асинхронная точка входа для запуска всего приложения."""
         global error_counter
         init_db()
         
-        # --- Установка обработчиков сигналов в основном потоке ---
         self.setup_signal_handlers() 
-        # ---------------------------------------------------------
 
-        # Запуск основного цикла парсинга в отдельном потоке
         parser_thread = threading.Thread(target=self.main_loop, daemon=True)
         parser_thread.start()
         
-        # Ждём, пока main инициализирует планировщики и запустит парсинг
+
         await asyncio.sleep(5)
         
-        # Запускаем бота
+
         await self.bot_runner.run()
 
-# И соответственно, уберите или закомментируйте вызов setup_signal_handlers из main_loop:
     def main_loop(self):
         """Основной цикл запуска приложения."""
         global error_counter
-        # init_db() # Можно убрать отсюда, если он уже вызван в run()
-        # self.setup_signal_handlers() # <-- УБРАТЬ ЭТУ СТРОКУ
         started = False
         while not started:
             try:
@@ -993,7 +985,6 @@ class Application:
             except Exception as e:
                 error_counter += 1
                 custom_logger.error(f"Ошибка при запуске (попытка {error_counter}/{MAX_ERRORS_BEFORE_RESTART}): {e}")
-                # traceback.print_exc() # Раскомментируйте для подробного лога ошибок
                 if self.job_scheduler.scheduler:
                     self.job_scheduler.scheduler.shutdown()
                 if error_counter >= MAX_ERRORS_BEFORE_RESTART:
@@ -1004,7 +995,7 @@ class Application:
                     custom_logger.warning(f"Перезапуск через {RETRY_DELAY_AFTER_ERROR} секунд...")
                     time.sleep(RETRY_DELAY_AFTER_ERROR)
 
-# === Точка входа ===
+
 
 if __name__ == "__main__":
     app = Application()

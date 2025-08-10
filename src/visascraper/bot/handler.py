@@ -8,19 +8,18 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from sqlalchemy.orm import Session
+from aiogram.types import FSInputFile
 
 from database.db import SessionLocal
 from database.models import User
 from database.crud import search_by_passport, search_by_stay_permit
 
-# Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-# Загрузка переменных окружения
 load_dotenv()
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 BOT_PASSWORD = os.getenv("TELEGRAM_BOT_PASSWORD")
@@ -29,17 +28,14 @@ if not BOT_TOKEN or not BOT_PASSWORD:
     logger.error("TELEGRAM_BOT_TOKEN или TELEGRAM_BOT_PASSWORD не заданы в .env")
     raise ValueError("Не заданы необходимые переменные окружения")
 
-# Инициализация роутера
 bot_router = Router()
 
-# === Модели состояний ===
 class PassportSearch(StatesGroup):
     waiting_for_passport = State()
 
 class StayPermitSearch(StatesGroup):
     waiting_for_stay_permit = State()
 
-# === Функции работы с БД ===
 def get_user_by_telegram_id(db: Session, telegram_id: str):
     try:
         user = db.query(User).filter(User.telegram_id == telegram_id).first()
@@ -73,7 +69,6 @@ def is_authorized(db: Session, telegram_id: str) -> bool:
     logger.info(f"Проверка авторизации: telegram_id={telegram_id}, authorized={authorized}")
     return authorized
 
-# === Клавиатура ===
 def main_menu():
     kb = [
         [InlineKeyboardButton(text="🔍 Нажми чтобы узнать готовность визы", callback_data="search_passport")],
@@ -82,12 +77,11 @@ def main_menu():
     logger.info("Создана клавиатура главного меню")
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
-# === Хендлеры ===
 @bot_router.message(F.text == "/start")
 async def cmd_start(message: Message, state: FSMContext):
     user_id = str(message.from_user.id)
     logger.info(f"Команда /start от пользователя: telegram_id={user_id}")
-
+ 
     with SessionLocal() as db:
         if is_authorized(db, user_id):
             await message.answer("✅ Вы уже авторизованы!", reply_markup=main_menu())
@@ -96,7 +90,6 @@ async def cmd_start(message: Message, state: FSMContext):
     current_state = await state.get_state()
     logger.info(f"Текущее состояние после /start: {current_state}")
 
-# === Поиск по паспорту ===
 @bot_router.callback_query(lambda c: c.data == "search_passport")
 async def start_search(callback: CallbackQuery, state: FSMContext):
     user_id = str(callback.from_user.id)
@@ -152,14 +145,42 @@ async def process_passport_input(message: Message, state: FSMContext):
         return
 
     for result in results:
-        info = "\n".join([f"{key}: {value}" for key, value in result.__dict__.items() if not key.startswith("_")])
-        await message.answer(f"🔍 Результат:\n\n{info}")
+        info_data = {
+            "Батч номер": result.batch_no,
+            "Рег. номер": result.register_number,
+            "Полное имя": result.full_name,
+            "Номер визы": result.visitor_visa_number,
+            "Тип визы": result.visa_type,
+            "Номер паспорта": result.passport_number,
+            "Дата оплаты": result.payment_date,
+            "День рождения": result.birth_date,
+            "Статус": result.status,
+            "Аккаунт": result.account
+        }
+        info = "\n".join([f"{key}: {value}" for key, value in info_data.items()])
+        
+
+        file_path = f"src/temp/{result.register_number}_batch_application.pdf"
+        
+
+        if os.path.exists(file_path):
+            try:
+                document = FSInputFile(file_path)
+                await message.answer_document(
+                    document=document,
+                    caption=f" Результат по готовности визы:\n\n{info}"
+                )
+            except Exception as e:
+                logger.error(f"Ошибка отправки файла {file_path}: {e}")
+                await message.answer(f"❌ Ошибка отправки файла для рег. номера {result.reg_number}")
+        else:
+            logger.warning(f"Файл не найден: {file_path}")
+            await message.answer(f" Результат:\n\n{info}\n\n⚠️ Файл разрешения отсутствует")
 
     await message.answer("Выберите действие:", reply_markup=main_menu())
     await state.clear()
     logger.info(f"Состояние очищено для user_id={user_id}")
 
-# === Поиск по разрешению на проживание ===
 @bot_router.callback_query(lambda c: c.data == "search_stay_permit")
 async def start_search_stay(callback: CallbackQuery, state: FSMContext):
     user_id = str(callback.from_user.id)
@@ -215,14 +236,42 @@ async def process_stay_permit_input(message: Message, state: FSMContext):
         return
 
     for result in results:
-        info = "\n".join([f"{key}: {value}" for key, value in result.__dict__.items() if not key.startswith("_")])
-        await message.answer(f"🏠 Результат:\n\n{info}")
+        info_data = {
+            "Рег. номер": result.reg_number,
+            "Полное имя": result.name,
+            "Тип разрешения": result.type_of_staypermit,
+            "Тип визы": result.visa_type,
+            "Номер паспорта": result.passport_number,
+            "Дата прибытия": result.arrival_date,
+            "Дата выдачи": result.issue_date,
+            "Срок действия": result.expired_date,
+            "Статус": result.status,
+            "Аккаунт": result.account
+        }
+        info = "\n".join([f"{key}: {value}" for key, value in info_data.items()])
+        
+
+        file_path = f"src/temp/{result.reg_number}_stay_permit.pdf"
+        
+
+        if os.path.exists(file_path):
+            try:
+                document = FSInputFile(file_path)
+                await message.answer_document(
+                    document=document,
+                    caption=f"🏠 Результат по разрешению на проживание:\n\n{info}"
+                )
+            except Exception as e:
+                logger.error(f"Ошибка отправки файла {file_path}: {e}")
+                await message.answer(f"❌ Ошибка отправки файла для рег. номера {result.reg_number}")
+        else:
+            logger.warning(f"Файл не найден: {file_path}")
+            await message.answer(f"🏠 Результат:\n\n{info}\n\n⚠️ Файл разрешения отсутствует")
 
     await message.answer("Выберите действие:", reply_markup=main_menu())
     await state.clear()
     logger.info(f"Состояние очищено для user_id={user_id}")
 
-# === Обработка текстовых сообщений (последний по приоритету) ===
 @bot_router.message(F.text)
 async def check_password_or_other_text(message: Message, state: FSMContext):
     user_id = str(message.from_user.id)
@@ -248,30 +297,3 @@ async def check_password_or_other_text(message: Message, state: FSMContext):
             await message.answer("✅ Авторизация успешна!", reply_markup=main_menu())
         else:
             await message.answer("❌ Ошибка при авторизации.")
-
-# === Основная функция ===
-async def main():
-    logger.info("Запуск бота...")
-    bot = Bot(token=BOT_TOKEN)
-    try:
-        bot_info = await bot.get_me()
-        logger.info(f"Бот успешно запущен: username={bot_info.username}")
-    except Exception as e:
-        logger.error(f"Ошибка при проверке токена: {e}")
-        return
-
-    dp = Dispatcher(storage=MemoryStorage())
-    dp.include_router(bot_router)
-    logger.info("Роутер подключен, начинаем polling...")
-
-    try:
-        await dp.start_polling(bot)
-    except Exception as e:
-        logger.error(f"Ошибка при запуске polling: {e}")
-    finally:
-        await bot.session.close()
-        logger.info("Бот остановлен")
-
-if __name__ == "__main__":
-    pass
-    #asyncio.run(main())
