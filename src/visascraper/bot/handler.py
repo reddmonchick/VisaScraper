@@ -83,17 +83,19 @@ def is_authorized(db: Session, telegram_id: str) -> bool:
 
 # --- Новые хендлеры для админ-панели ---
 
-@bot_router.message(F.text == "/admin")
-async def cmd_admin(message: Message, state: FSMContext):
-    user_id = str(message.from_user.id)
-    logger.info(f"Команда /admin от пользователя: telegram_id={user_id}")
+@bot_router.callback_query(F.data == "admin_panel")
+async def callback_admin(callback: CallbackQuery, state: FSMContext):
+    user_id = str(callback.from_user.id)
+    logger.info(f"Callback admin_panel от пользователя: telegram_id={user_id}")
 
     if user_id in authorized_admins:
-        await message.answer("Вы уже в админ-панели.", reply_markup=admin_menu())
+        await callback.message.answer("Вы уже в админ-панели.", reply_markup=admin_menu())
+        await callback.answer()
         return
 
     await state.set_state(AdminLogin.waiting_for_password)
-    await message.answer("🔐 Введите пароль администратора:")
+    await callback.message.answer("🔐 Введите пароль администратора:")
+    await callback.answer()
 
 @bot_router.message(AdminLogin.waiting_for_password)
 async def process_admin_password(message: Message, state: FSMContext):
