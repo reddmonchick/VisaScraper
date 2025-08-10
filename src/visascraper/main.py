@@ -900,23 +900,16 @@ class JobScheduler:
             coalesce=True,
             misfire_grace_time=60 * 5
         )
-        self.scheduler.add_job(
-            self.job_others,
-            'cron',
-            hour=STAY_PARSE_HOUR,
-            minute=STAY_PARSE_MINUTE,
-            coalesce=True,
-            misfire_grace_time=60 * 5
-        )
         self.scheduler.start()
         scheduler_jobs = self.scheduler # Для совместимости с shutdown_handler
         custom_logger.info("Планировщик парсинга запущен")
 
 class BotRunner:
     """Запуск и управление Telegram ботом."""
-    def __init__(self):
+    def __init__(self, app):
         self.bot = Bot(token=os.getenv("TELEGRAM_BOT_TOKEN"))
-        self.dp = Dispatcher(storage=MemoryStorage())
+        # Передаем экземпляр 'app' в Dispatcher, чтобы он был доступен в хендлерах
+        self.dp = Dispatcher(storage=MemoryStorage(), app=app)
         self.dp.include_router(bot_router)
 
     async def run(self):
@@ -934,7 +927,8 @@ class Application:
         self.gs_manager = GoogleSheetsManager(GS_CREDENTIALS_PATH)
         # Передаем data_parser в JobScheduler
         self.job_scheduler = JobScheduler(self.gs_manager, self.data_parser) 
-        self.bot_runner = BotRunner()
+        # Передаем 'self' (экземпляр Application) в BotRunner
+        self.bot_runner = BotRunner(self)
 
     def shutdown_handler(self, signum, frame):
         """Обработчик сигналов завершения."""

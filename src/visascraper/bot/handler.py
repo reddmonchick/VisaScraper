@@ -13,6 +13,7 @@ from aiogram.types import FSInputFile
 from database.db import SessionLocal
 from database.models import User
 from database.crud import search_by_passport, search_by_stay_permit
+from .keyboards import main_menu, admin_menu # Импортируем новое меню
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,12 +24,23 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 BOT_PASSWORD = os.getenv("TELEGRAM_BOT_PASSWORD")
+# Новый пароль для админа
+TELEGRAM_ADMIN_PASSWORD = os.getenv("TELEGRAM_ADMIN_PASSWORD")
 
-if not BOT_TOKEN or not BOT_PASSWORD:
-    logger.error("TELEGRAM_BOT_TOKEN или TELEGRAM_BOT_PASSWORD не заданы в .env")
+
+if not BOT_TOKEN or not BOT_PASSWORD or not TELEGRAM_ADMIN_PASSWORD:
+    logger.error("Одна из переменных (TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_PASSWORD, TELEGRAM_ADMIN_PASSWORD) не задана в .env")
     raise ValueError("Не заданы необходимые переменные окружения")
 
 bot_router = Router()
+
+# --- Новые глобальные переменные и состояния ---
+authorized_admins = set()
+is_parsing_running = False
+
+class AdminLogin(StatesGroup):
+    waiting_for_password = State()
+# --- Конец новых переменных ---
 
 class PassportSearch(StatesGroup):
     waiting_for_passport = State()
@@ -69,13 +81,64 @@ def is_authorized(db: Session, telegram_id: str) -> bool:
     logger.info(f"Проверка авторизации: telegram_id={telegram_id}, authorized={authorized}")
     return authorized
 
-def main_menu():
-    kb = [
-        [InlineKeyboardButton(text="🔍 Нажми чтобы узнать готовность визы", callback_data="search_passport")],
-        [InlineKeyboardButton(text="🏠 Получить ITK", callback_data="search_stay_permit")]
-    ]
-    logger.info("Создана клавиатура главного меню")
-    return InlineKeyboardMarkup(inline_keyboard=kb)
+# --- Новые хендлеры для админ-панели ---
+
+@bot_router.message(F.text == "/admin")
+async def cmd_admin(message: Message, state: FSMContext):
+    user_id = str(message.from_user.id)
+    logger.info(f"Команда /admin от пользователя: telegram_id={user_id}")
+
+    if user_id in authorized_admins:
+        await message.answer("Вы уже в админ-панели.", reply_markup=admin_menu())
+        return
+
+    await state.set_state(AdminLogin.waiting_for_password)
+    await message.answer("🔐 Введите пароль администратора:")
+
+@bot_router.message(AdminLogin.waiting_for_password)
+async def process_admin_password(message: Message, state: FSMContext):
+    user_id = str(message.from_user.id)
+    entered_password = message.text.strip()
+
+    if entered_password == TELEGRAM_ADMIN_PASSWORD:
+        authorized_admins.add(user_id)
+        await state.clear()
+        await message.answer("✅ Доступ предоставлен.", reply_markup=admin_menu())
+        logger.info(f"Пользователь {user_id} получил доступ к админ-панели.")
+    else:
+        await message.answer("❌ Неверный пароль.")
+        logger.warning(f"Попытка входа в админ-панель с неверным паролем от {user_id}.")
+
+@bot_router.callback_query(F.data == "start_parsing_others")
+async def start_parsing_others(callback: CallbackQuery, bot: Bot, app): # app будет передан через middleware
+    user_id = str(callback.from_user.id)
+    global is_parsing_running
+
+    if user_id not in authorized_admins:
+        await callback.answer("⚠️ У вас нет доступа к этой функции.", show_alert=True)
+        return
+
+    if is_parsing_running:
+        await callback.answer("Парсинг уже запущен, пожалуйста, подождите.", show_alert=True)
+        return
+
+    is_parsing_running = True
+    await callback.message.answer("🚀 Процесс парсинга второстепенных аккаунтов запущен...")
+    await callback.answer()
+    logger.info(f"Администратор {user_id} запустил парсинг.")
+
+    try:
+        # Запускаем тяжелую, синхронную задачу в отдельном потоке
+        await asyncio.to_thread(app.job_scheduler.job_others)
+        await bot.send_message(user_id, "✅ Парсинг успешно завершен!")
+        logger.info("Парсинг второстепенных аккаунтов завершен.")
+    except Exception as e:
+        await bot.send_message(user_id, f"❌ Во время парсинга произошла ошибка: {e}")
+        logger.error(f"Ошибка во время парсинга, запущенного администратором {user_id}: {e}", exc_info=True)
+    finally:
+        is_parsing_running = False
+
+# --- Существующие хендлеры ---
 
 @bot_router.message(F.text == "/start")
 async def cmd_start(message: Message, state: FSMContext):
@@ -106,7 +169,6 @@ async def start_search(callback: CallbackQuery, state: FSMContext):
     await state.set_state(PassportSearch.waiting_for_passport)
     current_state = await state.get_state()
     logger.info(f"Установлено состояние: {current_state} для user_id={user_id}")
-    #await callback.message.answer(f"Текущее состояние: {current_state}")
     await callback.message.answer("Введите имя и фамилию на латинице и номер паспорта")
     await callback.message.answer("Пример: ROMAN DUDUKALOV 4729312290")
     await callback.answer()
@@ -159,10 +221,8 @@ async def process_passport_input(message: Message, state: FSMContext):
         }
         info = "\n".join([f"{key}: {value}" for key, value in info_data.items()])
         
-
         file_path = f"src/temp/{result.register_number}_batch_application.pdf"
         
-
         if os.path.exists(file_path):
             try:
                 document = FSInputFile(file_path)
@@ -197,7 +257,6 @@ async def start_search_stay(callback: CallbackQuery, state: FSMContext):
     await state.set_state(StayPermitSearch.waiting_for_stay_permit)
     current_state = await state.get_state()
     logger.info(f"Установлено состояние: {current_state} для user_id={user_id}")
-    #await callback.message.answer(f"Текущее состояние: {current_state}")
     await callback.message.answer("Введите имя и фамилию на латинице и номер паспорта")
     await callback.message.answer("Пример: ROMAN DUDUKALOV 4729312290")
     await callback.answer()
@@ -250,10 +309,8 @@ async def process_stay_permit_input(message: Message, state: FSMContext):
         }
         info = "\n".join([f"{key}: {value}" for key, value in info_data.items()])
         
-
         file_path = f"src/temp/{result.reg_number}_stay_permit.pdf"
         
-
         if os.path.exists(file_path):
             try:
                 document = FSInputFile(file_path)
@@ -277,6 +334,11 @@ async def check_password_or_other_text(message: Message, state: FSMContext):
     user_id = str(message.from_user.id)
     current_state = await state.get_state()
     logger.info(f"Получено текстовое сообщение: text={message.text}, user_id={user_id}, state={current_state}")
+
+    # Если мы в состоянии ожидания админского пароля, этот хендлер не должен сработать
+    if await state.get_state() is not None:
+        # Можно добавить логику или просто проигнорировать, так как есть более специфичные хендлеры
+        return
 
     with SessionLocal() as db:
         if is_authorized(db, user_id):
