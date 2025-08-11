@@ -13,45 +13,7 @@ from aiogram.types import FSInputFile
 from database.db import SessionLocal
 from database.models import User
 from database.crud import search_by_passport, search_by_stay_permit
-from .keyboards import main_menu, admin_menu
-from infrastructure.event_bus import EventBus
-
-# --- Event Handlers for Parser Service Events ---
-
-async def on_parsing_finished(bot: Bot, user_id: str, success: bool, error_message: str = None):
-    """Sends a message to the user when parsing is complete."""
-    try:
-        if success:
-            await bot.send_message(user_id, "✅ Парсинг успешно завершен!")
-            logger.info(f"Уведомление об успешном завершении отправлено пользователю {user_id}")
-        else:
-            await bot.send_message(user_id, f"❌ Во время парсинга произошла ошибка: {error_message}")
-            logger.error(f"Уведомление об ошибке парсинга отправлено пользователю {user_id}: {error_message}")
-    except Exception as e:
-        logger.error(f"Не удалось отправить сообщение о завершении парсинга пользователю {user_id}: {e}")
-
-async def on_parsing_already_running(bot: Bot, user_id: str):
-    """Informs the user that parsing is already in progress."""
-    try:
-        await bot.send_message(user_id, "⚠️ Парсинг уже запущен, пожалуйста, подождите.")
-        logger.warning(f"Уведомление 'парсинг уже запущен' отправлено пользователю {user_id}")
-    except Exception as e:
-        logger.error(f"Не удалось отправить сообщение 'парсинг уже запущен' пользователю {user_id}: {e}")
-
-def setup_bot_event_listeners(event_bus: EventBus, bot: Bot, loop: asyncio.AbstractEventLoop):
-    """Subscribes bot functions to events from the event bus in a thread-safe manner."""
-
-    def finished_handler(user_id, success, error_message=None):
-        coro = on_parsing_finished(bot, user_id, success, error_message)
-        asyncio.run_coroutine_threadsafe(coro, loop)
-
-    def already_running_handler(user_id):
-        coro = on_parsing_already_running(bot, user_id)
-        asyncio.run_coroutine_threadsafe(coro, loop)
-
-    event_bus.subscribe('parsing:finished', finished_handler)
-    event_bus.subscribe('parsing:already_running', already_running_handler)
-    logger.info("Слушатели событий бота успешно настроены.")
+from .keyboards import main_menu, admin_menu # Импортируем новое меню
 
 logging.basicConfig(
     level=logging.INFO,
@@ -150,16 +112,33 @@ async def process_admin_password(message: Message, state: FSMContext):
         logger.warning(f"Попытка входа в админ-панель с неверным паролем от {user_id}.")
 
 @bot_router.callback_query(F.data == "start_parsing_others")
-async def start_parsing_others(callback: CallbackQuery, event_bus: EventBus):
+async def start_parsing_others(callback: CallbackQuery, bot: Bot, app): # app будет передан через middleware
     user_id = str(callback.from_user.id)
+    global is_parsing_running
+
     if user_id not in authorized_admins:
         await callback.answer("⚠️ У вас нет доступа к этой функции.", show_alert=True)
         return
 
-    logger.info(f"Администратор {user_id} инициировал событие 'parsing:start_others'.")
-    event_bus.publish('parsing:start_others', user_id=user_id)
-    await callback.message.answer("🚀 Запрос на запуск парсинга отправлен...")
+    if is_parsing_running:
+        await callback.answer("Парсинг уже запущен, пожалуйста, подождите.", show_alert=True)
+        return
+
+    is_parsing_running = True
+    await callback.message.answer("🚀 Процесс парсинга второстепенных аккаунтов запущен...")
     await callback.answer()
+    logger.info(f"Администратор {user_id} запустил парсинг.")
+
+    try:
+        # Запускаем тяжелую, синхронную задачу в отдельном потоке
+        await asyncio.to_thread(app.job_scheduler.job_others)
+        await bot.send_message(user_id, "✅ Парсинг успешно завершен!")
+        logger.info("Парсинг второстепенных аккаунтов завершен.")
+    except Exception as e:
+        await bot.send_message(user_id, f"❌ Во время парсинга произошла ошибка: {e}")
+        logger.error(f"Ошибка во время парсинга, запущенного администратором {user_id}: {e}", exc_info=True)
+    finally:
+        is_parsing_running = False
 
 # --- Существующие хендлеры ---
 
