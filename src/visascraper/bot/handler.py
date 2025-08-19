@@ -238,16 +238,16 @@ async def process_stay_permit_input(message: Message, state: FSMContext):
 
     for result in results:
         info = f"""
-Рег. номер: {result.reg_number}
-Полное имя: {result.name}
-Тип разрешения: {result.type_of_staypermit}
-Тип визы: {result.visa_type}
-Номер паспорта: {result.passport_number}
-Дата прибытия: {result.arrival_date}
-Дата выдачи: {result.issue_date}
-Срок действия: {result.expired_date}
-Статус: {result.status}
-Аккаунт: {result.account}
+                Рег. номер: {result.reg_number}
+                Полное имя: {result.name}
+                Тип разрешения: {result.type_of_staypermit}
+                Тип визы: {result.visa_type}
+                Номер паспорта: {result.passport_number}
+                Дата прибытия: {result.arrival_date}
+                Дата выдачи: {result.issue_date}
+                Срок действия: {result.expired_date}
+                Статус: {result.status}
+                Аккаунт: {result.account}
         """.strip()
         
         file_path = f"src/temp/{result.reg_number}_stay_permit.pdf"

@@ -405,6 +405,8 @@ class DataParser:
                                 detail_response = self.session_manager.get_session().get(detail_link)
                                 detail_result = detail_response.text
                                 date_birth = detail_result.split('Date of Birth')[-1].split('</small')[0].split('<small>')[-1]
+                                if date_birth.count('/') != 2:
+                                    date_birth = ''
                             except Exception as ex:
                                 custom_logger.error(f'Ошибка при парсинге дня рождения клиента {detail_link}: {ex}')
 
