@@ -201,9 +201,9 @@ class YandexDiskUploader:
             meta = self.ya_disk_client.get_meta(file_path, fields=["public_url"])
             public_url = meta.public_url
             if not public_url:
-                custom_logger.error("Не удалось получить публичную ссылку")
+                #custom_logger.error("Не удалось получить публичную ссылку")
                 raise Exception("Не удалось получить публичную ссылку после публикации")
-            custom_logger.info(f"Файл успешно загружен, публичная ссылка: {public_url}")
+            #custom_logger.info(f"Файл успешно загружен, публичная ссылка: {public_url}")
             return public_url
 
         except yadisk.exceptions.YaDiskError as e:
@@ -256,7 +256,7 @@ class PDFManager:
                     # Сохраняем локально (аналогично Stay Permit)
                     with open(temp_path, "wb") as f:
                         f.write(pdf_content)
-                    custom_logger.info(f"✅ PDF для Batch {full_name} ({reg_number}) скачан и сохранён локально.")
+                    #custom_logger.info(f"✅ PDF для Batch {full_name} ({reg_number}) скачан и сохранён локально.")
                 else:
                     custom_logger.warning(f"⚠️ Не удалось скачать PDF для Batch {full_name} ({reg_number}) по ссылке {action_link_original}")
                     return action_link_yandex # Возвращаем пустую строку
@@ -264,13 +264,14 @@ class PDFManager:
                 # Используем существующую локальную копию (аналогично Stay Permit)
                 with open(temp_path, "rb") as f:
                     pdf_content = f.read()
-                custom_logger.info(f"✅ Используем локальную копию PDF для Batch {full_name} ({reg_number}).")
+                #custom_logger.info(f"✅ Используем локальную копию PDF для Batch {full_name} ({reg_number}).")
 
             # Загружаем на Яндекс.Диск (общая логика)
             file_name_for_yandex = f"{reg_number}_batch_application.pdf" # Имя файла для Яндекс.Диска
             action_link_yandex = self.yandex_uploader.upload_pdf(pdf_content, file_name_for_yandex)
             if action_link_yandex:
-                custom_logger.info(f"✅ PDF для Batch {full_name} ({reg_number}) загружен. Ссылка: {action_link_yandex}")
+                pass
+                #custom_logger.info(f"✅ PDF для Batch {full_name} ({reg_number}) загружен. Ссылка: {action_link_yandex}")
             else:
                 custom_logger.error(f"❌ Не удалось получить публичную ссылку для Batch {full_name} ({reg_number}).")
 
@@ -294,7 +295,7 @@ class PDFManager:
                 if pdf_content:
                     with open(temp_path, "wb") as f:
                         f.write(pdf_content)
-                    custom_logger.info(f"✅ PDF для Stay Permit {reg_number} скачан и сохранён локально.")
+                    #custom_logger.info(f"✅ PDF для Stay Permit {reg_number} скачан и сохранён локально.")
                 else:
                     custom_logger.warning(f"⚠️ Не удалось скачать PDF для Stay Permit {reg_number} по ссылке {pdf_full_url}")
                     return action_link_yandex
@@ -306,7 +307,7 @@ class PDFManager:
             public_link = self.yandex_uploader.upload_pdf(pdf_content, f"{reg_number}_stay_permit.pdf")
             if public_link:
                 action_link_yandex = public_link
-                custom_logger.info(f"✅ PDF для Stay Permit {reg_number} загружен. Ссылка: {action_link_yandex}")
+                #custom_logger.info(f"✅ PDF для Stay Permit {reg_number} загружен. Ссылка: {action_link_yandex}")
             else:
                 custom_logger.error(f"❌ Не удалось получить публичную ссылку для Stay Permit {reg_number}.")
 
@@ -404,6 +405,8 @@ class DataParser:
                                 detail_response = self.session_manager.get_session().get(detail_link)
                                 detail_result = detail_response.text
                                 date_birth = detail_result.split('Date of Birth')[-1].split('</small')[0].split('<small>')[-1]
+                                if date_birth.count('/') != 2:
+                                    date_birth = ''
                             except Exception as ex:
                                 custom_logger.error(f'Ошибка при парсинге дня рождения клиента {detail_link}: {ex}')
 
@@ -807,83 +810,97 @@ class JobScheduler:
     def job_first_two(self):
         """Задача для парсинга первых двух аккаунтов."""
         custom_logger.info("Запуск задачи для первых двух аккаунтов")
-        try:
-            if not self.gs_manager.gc:
-                 self.gs_manager._init_client()
-                 
-            spreadsheet_batch = self.gs_manager.gc.open_by_key(GS_BATCH_SHEET_ID)
-            worksheet_account = spreadsheet_batch.worksheet('Аккаунты')
-            names = worksheet_account.col_values(1) # Пропускаем заголовок
-            passwords = worksheet_account.col_values(2)
+        attempt = 0
+        max_attempts = 3
+        while attempt < max_attempts:
+            try:
+                if not self.gs_manager.gc:
+                    self.gs_manager._init_client()
+                    
+                spreadsheet_batch = self.gs_manager.gc.open_by_key(GS_BATCH_SHEET_ID)
+                worksheet_account = spreadsheet_batch.worksheet('Аккаунты')
+                names = worksheet_account.col_values(1) # Пропускаем заголовок
+                passwords = worksheet_account.col_values(2)
 
-            if len(names) < 2:
-                custom_logger.warning("Недостаточно аккаунтов для выполнения задачи первых двух")
-                return # Выходим, если аккаунтов меньше 2
+                if len(names) < 2:
+                    custom_logger.warning("Недостаточно аккаунтов для выполнения задачи первых двух")
+                    return # Выходим, если аккаунтов меньше 2
 
-            first_two_names = names[:2]
-            first_two_passwords = passwords[:2]
+                first_two_names = names[:2]
+                first_two_passwords = passwords[:2]
 
-            # --- ИНТЕГРАЦИЯ: Вызов парсинга через DataParser ---
-            batch_app, batch_mgr, stay = self.data_parser.parse_accounts(first_two_names, first_two_passwords)
-            # --- КОНЕЦ ИНТЕГРАЦИИ ---
+                # --- ИНТЕГРАЦИЯ: Вызов парсинга через DataParser ---
+                batch_app, batch_mgr, stay = self.data_parser.parse_accounts(first_two_names, first_two_passwords)
+                # --- КОНЕЦ ИНТЕГРАЦИИ ---
 
-            # Кэшируем данные
-            self.cached_batch_application_data = batch_app
-            self.cached_manager_data = batch_mgr
-            self.cached_stay_permit_data = stay
+                # Кэшируем данные
+                self.cached_batch_application_data = batch_app
+                self.cached_manager_data = batch_mgr
+                self.cached_stay_permit_data = stay
 
-            # Записываем в Google Sheets
-            self.gs_manager.write_to_sheet(GS_BATCH_SHEET_ID, batch_app, batch_mgr, stay)
+                # Записываем в Google Sheets
+                self.gs_manager.write_to_sheet(GS_BATCH_SHEET_ID, batch_app, batch_mgr, stay)
 
-        except Exception as e:
-            custom_logger.error(f"[job_first_two] Критическая ошибка: {e}", exc_info=True)
-            # Не вызываем raise здесь, чтобы не останавливать планировщик из-за одной задачи
-            # Но можно залогировать и/или отправить уведомление
+            except Exception as e:
+                custom_logger.error(f"[job_first_two] Критическая ошибка: {e} Пробуем ещё раз")
+                if attempt >= max_attempts:
+                    custom_logger.warning(f"[job_first_two] Критическая ошибка {e} заканчиваем попытки")
+                    return []
+                    break
+                time.sleep(10)
 
     def job_others(self):
         """Задача для парсинга остальных аккаунтов."""
         custom_logger.info("Запуск задачи для остальных аккаунтов")
-        try:
-             if not self.gs_manager.gc:
-                 self.gs_manager._init_client()
-                 
-             spreadsheet_batch = self.gs_manager.gc.open_by_key(GS_BATCH_SHEET_ID)
-             worksheet_account = spreadsheet_batch.worksheet('Аккаунты')
-             names = worksheet_account.col_values(1) # Пропускаем заголовок
-             passwords = worksheet_account.col_values(2)
+        attempt = 0
+        max_attempts = 3
+        while attempt < max_attempts:
+            try:
+                if not self.gs_manager.gc:
+                    self.gs_manager._init_client()
+                    
+                spreadsheet_batch = self.gs_manager.gc.open_by_key(GS_BATCH_SHEET_ID)
+                worksheet_account = spreadsheet_batch.worksheet('Аккаунты')
+                names = worksheet_account.col_values(1) # Пропускаем заголовок
+                passwords = worksheet_account.col_values(2)
 
-             if len(names) <= 2:
-                 custom_logger.info("Недостаточно аккаунтов для выполнения полного цикла")
-                 # Все данные уже обработаны job_first_two
-                 # Записываем кэшированные данные, если они есть
-                 if self.cached_batch_application_data or self.cached_manager_data or self.cached_stay_permit_data:
-                      self.gs_manager.write_to_sheet(
-                          GS_BATCH_SHEET_ID,
-                          self.cached_batch_application_data,
-                          self.cached_manager_data,
-                          self.cached_stay_permit_data
-                      )
-                 return # Выходим, если аккаунтов <= 2
+                if len(names) <= 2:
+                    custom_logger.info("Недостаточно аккаунтов для выполнения полного цикла")
+                    # Все данные уже обработаны job_first_two
+                    # Записываем кэшированные данные, если они есть
+                    if self.cached_batch_application_data or self.cached_manager_data or self.cached_stay_permit_data:
+                        self.gs_manager.write_to_sheet(
+                            GS_BATCH_SHEET_ID,
+                            self.cached_batch_application_data,
+                            self.cached_manager_data,
+                            self.cached_stay_permit_data
+                        )
+                    return # Выходим, если аккаунтов <= 2
 
-             remaining_names = names[2:]
-             remaining_passwords = passwords[2:]
+                remaining_names = names[2:]
+                remaining_passwords = passwords[2:]
 
-             # --- ИНТЕГРАЦИЯ: Вызов парсинга через DataParser ---
-             batch_app_new, batch_mgr_new, stay_new = self.data_parser.parse_accounts(remaining_names, remaining_passwords)
-             # --- КОНЕЦ ИНТЕГРАЦИИ ---
+                # --- ИНТЕГРАЦИЯ: Вызов парсинга через DataParser ---
+                batch_app_new, batch_mgr_new, stay_new = self.data_parser.parse_accounts(remaining_names, remaining_passwords)
+                # --- КОНЕЦ ИНТЕГРАЦИИ ---
 
-             # Объединяем кэшированные данные с новыми
-             full_batch = self.cached_batch_application_data + batch_app_new
-             full_manager = self.cached_manager_data + batch_mgr_new
-             full_stay = self.cached_stay_permit_data + stay_new
+                # Объединяем кэшированные данные с новыми
+                full_batch = self.cached_batch_application_data + batch_app_new
+                full_manager = self.cached_manager_data + batch_mgr_new
+                full_stay = self.cached_stay_permit_data + stay_new
 
-             # Записываем полный набор данных в Google Sheets
-             self.gs_manager.write_to_sheet(GS_BATCH_SHEET_ID, full_batch, full_manager, full_stay)
+                # Записываем полный набор данных в Google Sheets
+                self.gs_manager.write_to_sheet(GS_BATCH_SHEET_ID, full_batch, full_manager, full_stay)
+                break
 
-        except Exception as e:
-            custom_logger.error(f"[job_others] Критическая ошибка: {e}", exc_info=True)
-            # Не вызываем raise здесь, чтобы не останавливать планировщик из-за одной задачи
-            # Но можно залогировать и/или отправить уведомление
+            except Exception as e:
+                custom_logger.error(f"[job_others] Критическая ошибка: {e} Пробуем ещё раз")
+                if attempt >= max_attempts:
+                    custom_logger.warning(f"[job_others] Критическая ошибка {e} заканчиваем попытки")
+                    return []
+                    break
+                time.sleep(10)
+
 
     def start_scheduler(self):
         """Запускает планировщик задач парсинга."""
@@ -900,23 +917,16 @@ class JobScheduler:
             coalesce=True,
             misfire_grace_time=60 * 5
         )
-        self.scheduler.add_job(
-            self.job_others,
-            'cron',
-            hour=STAY_PARSE_HOUR,
-            minute=STAY_PARSE_MINUTE,
-            coalesce=True,
-            misfire_grace_time=60 * 5
-        )
         self.scheduler.start()
         scheduler_jobs = self.scheduler # Для совместимости с shutdown_handler
         custom_logger.info("Планировщик парсинга запущен")
 
 class BotRunner:
     """Запуск и управление Telegram ботом."""
-    def __init__(self):
+    def __init__(self, app):
         self.bot = Bot(token=os.getenv("TELEGRAM_BOT_TOKEN"))
-        self.dp = Dispatcher(storage=MemoryStorage())
+        # Передаем экземпляр 'app' в Dispatcher, чтобы он был доступен в хендлерах
+        self.dp = Dispatcher(storage=MemoryStorage(), app=app)
         self.dp.include_router(bot_router)
 
     async def run(self):
@@ -934,7 +944,8 @@ class Application:
         self.gs_manager = GoogleSheetsManager(GS_CREDENTIALS_PATH)
         # Передаем data_parser в JobScheduler
         self.job_scheduler = JobScheduler(self.gs_manager, self.data_parser) 
-        self.bot_runner = BotRunner()
+        # Передаем 'self' (экземпляр Application) в BotRunner
+        self.bot_runner = BotRunner(self)
 
     def shutdown_handler(self, signum, frame):
         """Обработчик сигналов завершения."""

@@ -149,23 +149,20 @@ def search_by_passport(db: Session, search_input: str):
     query = db.query(BatchApplication)
 
     # Фильтруем по имени, если есть части имени
-    if name_parts:
+    if name_parts and passport_number:
         name_filters = [BatchApplication.full_name.ilike(f"%{part}%") for part in name_parts]
         query = query.filter(or_(*name_filters))
-    
-    # Фильтруем по номеру паспорта, если он есть
-    if passport_number:
         query = query.filter(or_(
             BatchApplication.passport_number == passport_number,
             BatchApplication.passport_number.ilike(f"%{passport_number}%")
         ))
-
-    results = query.all()
-    logger.info(f"Найдено записей: {len(results)}")
-    for result in results:
-        logger.info(f"Результат: {result.__dict__}")
-    
-    return results
+        results = query.all()
+        logger.info(f"Найдено записей: {len(results)}")
+        for result in results:
+            pass
+            logger.info(f"Результат: {result.__dict__}")
+        
+        return results
 
 def search_by_stay_permit(db: Session, search_input: str):
     search_input = search_input.strip()
@@ -192,20 +189,18 @@ def search_by_stay_permit(db: Session, search_input: str):
     query = db.query(StayPermit)
 
     # Фильтруем по имени, если есть части имени
-    if name_parts:
+    if name_parts and passport_number:
         name_filters = [StayPermit.name.ilike(f"%{part}%") for part in name_parts]
         query = query.filter(or_(*name_filters))
-    
-    # Фильтруем по номеру паспорта, если он есть
-    if passport_number:
         query = query.filter(or_(
             StayPermit.passport_number == passport_number,
             StayPermit.passport_number.ilike(f"%{passport_number}%")
         ))
 
-    results = query.all()
-    logger.info(f"Найдено записей: {len(results)}")
-    for result in results:
-        logger.info(f"Результат: {result.__dict__}")
-    
-    return results
+
+        results = query.all()
+        logger.info(f"Найдено записей: {len(results)}")
+        for result in results:
+            logger.info(f"Результат: {result.__dict__}")
+        
+        return results
