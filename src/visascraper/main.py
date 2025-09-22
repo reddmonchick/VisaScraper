@@ -425,13 +425,11 @@ class DataParser:
                                 birth_date=date_birth
                             )
 
-                            # --- НОВАЯ ЛОГИКА: Загрузка PDF на Яндекс.Диск ---
+                            #Загрузка PDF на Яндекс.Диск ---
                             final_action_link = self.pdf_manager.upload_batch_pdf(
                                 session_id, action_link_original, batch_obj.register_number, batch_obj.full_name
                             )
                             batch_obj.action_link = final_action_link
-                            # --- КОНЕЦ НОВОЙ ЛОГИКИ ---
-
                             parsed_data_list.append(batch_obj)
                             items_in_batch += 1
                             items_parsed_total += 1
@@ -443,7 +441,7 @@ class DataParser:
                             custom_logger.error(f"Ошибка при обработке одного элемента Batch для {name}: {item_e}")
 
                     custom_logger.info(f"Обработан пакет Batch для {name}, offset={offset}, items={items_in_batch}")
-                    offset += 850 # Предполагаемый шаг пагинации
+                    offset += 850
 
                 # Сохранение в БД
                 db_dicts = [obj.to_db_dict() for obj in parsed_data_list]
@@ -464,7 +462,7 @@ class DataParser:
                     return [], []
                 time.sleep(10)
 
-        return [], [] # Дублируем return для безопасности типов
+        return [], [] 
 
     def fetch_and_update_stay(self, name: str, session_id: str) -> List[List[str]]:
         """Парсит данные Stay Permit для аккаунта."""
@@ -488,10 +486,8 @@ class DataParser:
                         'Sec-Fetch-Mode': 'cors',
                         'Sec-Fetch-Site': 'same-origin'
                     }
-                    # Note: params are often dynamically generated. You might need to adjust them.
                     params = {
                         'draw': '1',
-                        # ... (остальные параметры columns остаются без изменений) ...
                         'columns[11][data]': 'action',
                         'columns[11][searchable]': 'true',
                         'columns[11][orderable]': 'true',
@@ -555,7 +551,7 @@ class DataParser:
                                 account=name
                             )
 
-                            # --- НОВАЯ ЛОГИКА: Загрузка PDF на Яндекс.Диск ---
+                            # Загрузка PDF на Яндекс.Диск ---
                             action_html = safe_get(item_data, 'action')
                             pdf_relative_url = ''
                             if action_html:
@@ -563,7 +559,6 @@ class DataParser:
                             
                             public_link = self.pdf_manager.upload_stay_pdf(session_id, pdf_relative_url, stay_obj.reg_number)
                             stay_obj.action_link = public_link
-                            # --- КОНЕЦ НОВОЙ ЛОГИКИ ---
 
                             parsed_data_list.append(stay_obj)
                             items_in_batch += 1
@@ -576,7 +571,7 @@ class DataParser:
                             custom_logger.error(f"Ошибка при обработке одного элемента Stay Permit для {name}: {item_e}")
 
                     custom_logger.info(f"Обработан пакет Stay Permit для {name}, offset={offset}, items={items_in_batch}")
-                    offset += 1250 # Предполагаемый шаг пагинации
+                    offset += 1250
 
                 # Сохранение в БД
                 db_dicts = [obj.to_db_dict() for obj in parsed_data_list]
@@ -655,7 +650,7 @@ class GoogleSheetsManager:
     def _parse_date_for_sorting(self, date_str: str) -> date:
         """Преобразует строку даты 'DD-MM-YYYY' в datetime.date для сортировки."""
         if not date_str:
-            return date.min # Помещаем пустые даты в конец
+            return date.min 
         try:
             return datetime.strptime(date_str, PAYMENT_DATE_FORMAT).date()
         except ValueError:
@@ -829,9 +824,8 @@ class JobScheduler:
                 first_two_names = names[:2]
                 first_two_passwords = passwords[:2]
 
-                # --- ИНТЕГРАЦИЯ: Вызов парсинга через DataParser ---
+                # Вызов парсинга через DataParser ---
                 batch_app, batch_mgr, stay = self.data_parser.parse_accounts(first_two_names, first_two_passwords)
-                # --- КОНЕЦ ИНТЕГРАЦИИ ---
 
                 # Кэшируем данные
                 self.cached_batch_application_data = batch_app
@@ -880,9 +874,8 @@ class JobScheduler:
                 remaining_names = names[2:]
                 remaining_passwords = passwords[2:]
 
-                # --- ИНТЕГРАЦИЯ: Вызов парсинга через DataParser ---
+                # Вызов парсинга через DataParser ---
                 batch_app_new, batch_mgr_new, stay_new = self.data_parser.parse_accounts(remaining_names, remaining_passwords)
-                # --- КОНЕЦ ИНТЕГРАЦИИ ---
 
                 # Объединяем кэшированные данные с новыми
                 full_batch = self.cached_batch_application_data + batch_app_new
