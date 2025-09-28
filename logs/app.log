@@ -277,3 +277,29 @@ task: <Task cancelling name='Task-1' coro=<Application.run() done, defined at c:
 2025-09-28 13:50:35,750 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
 2025-09-28 13:50:35,796 - ERROR - [base_events] Task was destroyed but it is pending!
 task: <Task cancelling name='Task-1' coro=<Application.run() done, defined at c:\Users\vlad\Desktop\Parser_project\VisaScraper\src\visascraper\main.py:972> wait_for=<_GatheringFuture pending cb=[Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at C:\Users\vlad\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py:767]>
+2025-09-28 13:52:41,399 - INFO - [main] Запуск начального парсинга...
+2025-09-28 13:52:41,400 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-09-28 13:52:44,125 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:52:44,125 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:52:44,959 - INFO - [main] [NEXT STEP] переходим к следующему этапу
+2025-09-28 13:52:44,960 - INFO - [main] Начинаем парсинг Stay Permit для аккаунта: ALPHA VISA
+2025-09-28 13:52:46,415 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:52:46,419 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:52:46,419 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:52:46,420 - INFO - [base] Added job "notify_approved_users" to job store "default"
+2025-09-28 13:52:46,420 - INFO - [base] Added job "check_birthdays" to job store "default"
+2025-09-28 13:52:46,421 - INFO - [base] Added job "check_visa_expirations" to job store "default"
+2025-09-28 13:52:46,421 - INFO - [base] Scheduler started
+2025-09-28 13:52:46,421 - INFO - [dispatcher] Start polling
+2025-09-28 13:52:46,564 - INFO - [dispatcher] Run polling for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:52:50,465 - INFO - [handler] Команда /start от 1758719447
+2025-09-28 13:52:50,651 - INFO - [dispatcher] Update id=773542790 is handled. Duration 187 ms by bot id=8443851052
+2025-09-28 13:52:54,183 - INFO - [dispatcher] Update id=773542791 is handled. Duration 155 ms by bot id=8443851052
+2025-09-28 13:52:55,947 - INFO - [main] Спарсили 10 Stay Permit (аккаунт ALPHA VISA)
+2025-09-28 13:52:58,933 - INFO - [main] Запуск задачи для остальных аккаунтов
+2025-09-28 13:53:01,181 - INFO - [main] Начинаем парсинг для 138 аккаунтов.
+2025-09-28 13:53:01,181 - INFO - [main] Обрабатываем аккаунт kuzandrei24@gmail.com (1/138)
+2025-09-28 13:53:12,203 - INFO - [main] Спарсили 20 Stay Permit (аккаунт ALPHA VISA)
+2025-09-28 13:53:12,773 - WARNING - [result_handler] captcha_response = GetTaskResultResponseSer(status='ready', solution={'gRecaptchaResponse': '03AFcWeA48rbgvYXG8YuiJRzSkzuwL5fqplU78S8kdi1MbSGUf3a1xLc_X7x80pf-d8xK3IEYBOewPyKggTd3qGUqylNXgXtHE13KvoXzVK0kkcgS4aY16cpB-3p3IS6P8BBnSho6Hxq_or9YPq7Ji7RU8iJjhht8YSmV628fxV6ru2u3PsHc3EfaIuWvANOE2Q3H2eRESP3ecbRtPmtr4wqLmRAKLmgsCWUR77_9YUcjbKrIA7dNJqikd_B6v2MDYCVch99Vdo_XhPuAkmMaJFQjv1UKhaOpAgTDcxtWWmdUXXlHLJ8hEQS2HUbu8iOMxK0UpE5LZU7wP1BU41puq_hFW7jWpGCm0rsO7XXIOr8wfFhVDj7c-9YltA-gVjT7rIixXaI98t2KozqrwVrMXkpExbIZI-iDiw-IYWCgxpJw6Es6wdO8NzXjmH3GYlaSXxqdmrvNAlM8-t9RL-PZm7iCAV3O2ttaoSavyhrmuMt8By4-shp-7DqeYdxQ60YHCLl9mgiPm3lDoqYt3OAzE7LqJbhVsMnCGLFzjIBVxbAUyQ_wUAxpTP4ebFcFra-cYWqU9kXp_ey8TEDz45h_OmUWgjqUKYxMbuyFtzkp07gDMQYDBu6V3AzvH9yUVgFU10F8GSCqXdCU78sMnJAuHRe5SfzJxXkZCcok_JsVluaLMePxmBOu6Hjwi_W3-NrRTRpZbqE2-mJ4E', 'token': '03AFcWeA48rbgvYXG8YuiJRzSkzuwL5fqplU78S8kdi1MbSGUf3a1xLc_X7x80pf-d8xK3IEYBOewPyKggTd3qGUqylNXgXtHE13KvoXzVK0kkcgS4aY16cpB-3p3IS6P8BBnSho6Hxq_or9YPq7Ji7RU8iJjhht8YSmV628fxV6ru2u3PsHc3EfaIuWvANOE2Q3H2eRESP3ecbRtPmtr4wqLmRAKLmgsCWUR77_9YUcjbKrIA7dNJqikd_B6v2MDYCVch99Vdo_XhPuAkmMaJFQjv1UKhaOpAgTDcxtWWmdUXXlHLJ8hEQS2HUbu8iOMxK0UpE5LZU7wP1BU41puq_hFW7jWpGCm0rsO7XXIOr8wfFhVDj7c-9YltA-gVjT7rIixXaI98t2KozqrwVrMXkpExbIZI-iDiw-IYWCgxpJw6Es6wdO8NzXjmH3GYlaSXxqdmrvNAlM8-t9RL-PZm7iCAV3O2ttaoSavyhrmuMt8By4-shp-7DqeYdxQ60YHCLl9mgiPm3lDoqYt3OAzE7LqJbhVsMnCGLFzjIBVxbAUyQ_wUAxpTP4ebFcFra-cYWqU9kXp_ey8TEDz45h_OmUWgjqUKYxMbuyFtzkp07gDMQYDBu6V3AzvH9yUVgFU10F8GSCqXdCU78sMnJAuHRe5SfzJxXkZCcok_JsVluaLMePxmBOu6Hjwi_W3-NrRTRpZbqE2-mJ4E', 'cookies': {'empty': 'true'}}, cost='0.16', ip='37.212.80.103', createTime=1759056783, endTime=1759056784, solveCount=1, taskId=80751333307, balance=None, errorId=0, errorCode=None, errorDescription=None)
+2025-09-28 13:53:14,376 - INFO - [main] [NEXT STEP] переходим к следующему этапу
+2025-09-28 13:53:14,376 - INFO - [main] Начинаем парсинг Stay Permit для аккаунта: kuzandrei24@gmail.com
