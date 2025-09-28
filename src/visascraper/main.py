@@ -57,6 +57,7 @@ STAY_PARSE_MINUTE = 0
 GS_BATCH_SHEET_ID = os.getenv("GOOGLE_SHEET_BATCH_ID")
 GS_CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_JSON_PATH")
 YANDEX_TOKEN = os.getenv('YANDEX_TOKEN')
+PROXY = os.getenv('PROXY')
 
 
 IDX_BA_ACCOUNT = 10 # Индекс столбца 'account' в client_data_table (Batch)
@@ -139,9 +140,15 @@ class StayPermitData:
 # === Классы логики ===
 
 class SessionManager:
-    """Управление HTTP-сессией."""
-    def __init__(self):
+    """Управление HTTP-сессией с поддержкой прокси."""
+    def __init__(self, proxies: str = None):
         self.session = requests.Session()
+        if proxies:
+            proxies = {
+                'http': f'http://{proxies}',
+                'https': f'http://{proxies}'
+            }
+            self.session.proxies.update(proxies)
 
     def get_session(self) -> requests.Session:
         return self.session
@@ -608,11 +615,13 @@ class DataParser:
         for name, password in zip(account_names, account_passwords):
             custom_logger.info(f"Обрабатываем аккаунт {name} ({temp_counter + 1}/{len(account_names)})")
             session_id = load_session(name)
-            if not check_session(session_id):
-                session_id = login(name, password)
+            if not check_session(self.session_manager.get_session(), session_id):
+                session_id = login(self.session_manager.get_session(), name, password)
                 if not session_id:
                     custom_logger.warning(f"Не удалось залогиниться под {name}")
                     continue # Пропускаем аккаунт, если логин не удался
+
+            custom_logger.info(f'[NEXT STEP] переходим к следующему этапу')
 
             stay_data = self.fetch_and_update_stay(name, session_id)
             batch_app, batch_mgr = self.fetch_and_update_batch(name, session_id)
@@ -824,6 +833,7 @@ class JobScheduler:
                 first_two_names = names[:2]
                 first_two_passwords = passwords[:2]
 
+
                 # Вызов парсинга через DataParser ---
                 batch_app, batch_mgr, stay = self.data_parser.parse_accounts(first_two_names, first_two_passwords)
 
@@ -930,7 +940,7 @@ class BotRunner:
 class Application:
     """Основной класс приложения, объединяющий все компоненты."""
     def __init__(self):
-        self.session_manager = SessionManager()
+        self.session_manager = SessionManager(PROXY)
         self.yandex_uploader = YandexDiskUploader(YANDEX_TOKEN)
         self.pdf_manager = PDFManager(self.session_manager, self.yandex_uploader)
         self.data_parser = DataParser(self.session_manager, self.pdf_manager)
