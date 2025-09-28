@@ -1,0 +1,279 @@
+2025-09-28 13:17:53,880 - INFO - [main] Запуск начального парсинга...
+2025-09-28 13:17:53,880 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-09-28 13:17:57,120 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:17:57,120 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:17:58,470 - ERROR - [main] [job_first_two] Критическая ошибка: 'NoneType' object is not subscriptable Пробуем ещё раз
+2025-09-28 13:17:58,887 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:17:58,894 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:17:58,894 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:17:58,898 - INFO - [base] Added job "notify_approved_users" to job store "default"
+2025-09-28 13:17:58,898 - INFO - [base] Added job "check_birthdays" to job store "default"
+2025-09-28 13:17:58,898 - INFO - [base] Added job "check_visa_expirations" to job store "default"
+2025-09-28 13:17:58,898 - INFO - [base] Scheduler started
+2025-09-28 13:17:58,899 - INFO - [dispatcher] Start polling
+2025-09-28 13:17:59,028 - INFO - [dispatcher] Run polling for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:18:00,632 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:18:00,632 - INFO - [dispatcher] Polling stopped
+2025-09-28 13:18:00,632 - INFO - [dispatcher] Polling stopped for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:18:00,839 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:18:00,882 - ERROR - [base_events] Task was destroyed but it is pending!
+task: <Task cancelling name='Task-1' coro=<Application.run() done, defined at c:\Users\vlad\Desktop\Parser_project\VisaScraper\src\visascraper\main.py:969> wait_for=<_GatheringFuture pending cb=[Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at C:\Users\vlad\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py:767]>
+2025-09-28 13:18:37,816 - INFO - [main] Запуск начального парсинга...
+2025-09-28 13:18:37,816 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-09-28 13:18:40,664 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:18:40,664 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:18:42,252 - ERROR - [main] [job_first_two] Критическая ошибка: 'NoneType' object is not subscriptable Пробуем ещё раз
+2025-09-28 13:18:42,821 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:18:42,823 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:18:42,823 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:18:42,824 - INFO - [base] Added job "notify_approved_users" to job store "default"
+2025-09-28 13:18:42,824 - INFO - [base] Added job "check_birthdays" to job store "default"
+2025-09-28 13:18:42,824 - INFO - [base] Added job "check_visa_expirations" to job store "default"
+2025-09-28 13:18:42,825 - INFO - [base] Scheduler started
+2025-09-28 13:18:42,825 - INFO - [dispatcher] Start polling
+2025-09-28 13:18:42,952 - INFO - [dispatcher] Run polling for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:18:54,305 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:18:54,305 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:18:56,357 - ERROR - [main] [job_first_two] Критическая ошибка: 'NoneType' object is not subscriptable Пробуем ещё раз
+2025-09-28 13:19:08,925 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:19:08,925 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:19:11,134 - ERROR - [main] [job_first_two] Критическая ошибка: 'NoneType' object is not subscriptable Пробуем ещё раз
+2025-09-28 13:19:23,690 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:19:23,691 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:19:25,427 - ERROR - [main] [job_first_two] Критическая ошибка: 'NoneType' object is not subscriptable Пробуем ещё раз
+2025-09-28 13:19:27,843 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:19:27,844 - INFO - [dispatcher] Polling stopped
+2025-09-28 13:19:27,844 - INFO - [dispatcher] Polling stopped for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:19:28,032 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:19:28,076 - ERROR - [base_events] Task was destroyed but it is pending!
+task: <Task cancelling name='Task-1' coro=<Application.run() done, defined at c:\Users\vlad\Desktop\Parser_project\VisaScraper\src\visascraper\main.py:969> wait_for=<_GatheringFuture pending cb=[Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at C:\Users\vlad\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py:767]>
+2025-09-28 13:20:08,754 - INFO - [main] Запуск начального парсинга...
+2025-09-28 13:20:08,755 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-09-28 13:20:11,959 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:20:11,960 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:20:13,718 - ERROR - [main] [job_first_two] Критическая ошибка: 'NoneType' object is not subscriptable Пробуем ещё раз
+2025-09-28 13:20:13,766 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:20:13,769 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:20:13,769 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:20:13,770 - INFO - [base] Added job "notify_approved_users" to job store "default"
+2025-09-28 13:20:13,770 - INFO - [base] Added job "check_birthdays" to job store "default"
+2025-09-28 13:20:13,770 - INFO - [base] Added job "check_visa_expirations" to job store "default"
+2025-09-28 13:20:13,770 - INFO - [base] Scheduler started
+2025-09-28 13:20:13,771 - INFO - [dispatcher] Start polling
+2025-09-28 13:20:13,890 - INFO - [dispatcher] Run polling for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:20:26,547 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:20:26,547 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:20:28,881 - ERROR - [main] [job_first_two] Критическая ошибка: 'NoneType' object is not subscriptable Пробуем ещё раз
+2025-09-28 13:20:33,651 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:20:33,651 - INFO - [dispatcher] Polling stopped
+2025-09-28 13:20:33,652 - INFO - [dispatcher] Polling stopped for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:20:33,858 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:20:33,899 - ERROR - [base_events] Task was destroyed but it is pending!
+task: <Task cancelling name='Task-1' coro=<Application.run() done, defined at c:\Users\vlad\Desktop\Parser_project\VisaScraper\src\visascraper\main.py:971> wait_for=<_GatheringFuture pending cb=[Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at C:\Users\vlad\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py:767]>
+2025-09-28 13:21:28,459 - INFO - [main] Запуск начального парсинга...
+2025-09-28 13:21:28,460 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-09-28 13:21:31,364 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:21:31,364 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:21:32,976 - ERROR - [main] [job_first_two] Критическая ошибка: 'NoneType' object is not subscriptable Пробуем ещё раз
+2025-09-28 13:21:33,473 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:21:33,475 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:21:33,476 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:21:33,477 - INFO - [base] Added job "notify_approved_users" to job store "default"
+2025-09-28 13:21:33,477 - INFO - [base] Added job "check_birthdays" to job store "default"
+2025-09-28 13:21:33,477 - INFO - [base] Added job "check_visa_expirations" to job store "default"
+2025-09-28 13:21:33,477 - INFO - [base] Scheduler started
+2025-09-28 13:21:33,478 - INFO - [dispatcher] Start polling
+2025-09-28 13:21:33,635 - INFO - [dispatcher] Run polling for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:21:37,024 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:21:37,024 - INFO - [dispatcher] Polling stopped
+2025-09-28 13:21:37,025 - INFO - [dispatcher] Polling stopped for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:21:37,252 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:21:37,303 - ERROR - [base_events] Task was destroyed but it is pending!
+task: <Task cancelling name='Task-1' coro=<Application.run() done, defined at c:\Users\vlad\Desktop\Parser_project\VisaScraper\src\visascraper\main.py:971> wait_for=<_GatheringFuture pending cb=[Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at C:\Users\vlad\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py:767]>
+2025-09-28 13:22:49,173 - INFO - [main] Запуск начального парсинга...
+2025-09-28 13:22:49,173 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-09-28 13:22:52,877 - INFO - [main] NEXT STEP
+2025-09-28 13:22:52,878 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:22:52,878 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:22:54,188 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:22:54,191 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:22:54,191 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:22:54,192 - INFO - [base] Added job "notify_approved_users" to job store "default"
+2025-09-28 13:22:54,192 - INFO - [base] Added job "check_birthdays" to job store "default"
+2025-09-28 13:22:54,192 - INFO - [base] Added job "check_visa_expirations" to job store "default"
+2025-09-28 13:22:54,192 - INFO - [base] Scheduler started
+2025-09-28 13:22:54,193 - INFO - [dispatcher] Start polling
+2025-09-28 13:22:54,321 - INFO - [dispatcher] Run polling for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:22:54,535 - ERROR - [main] [job_first_two] Критическая ошибка: 'NoneType' object is not subscriptable Пробуем ещё раз
+2025-09-28 13:22:56,198 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:22:56,199 - INFO - [dispatcher] Polling stopped
+2025-09-28 13:22:56,199 - INFO - [dispatcher] Polling stopped for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:22:56,387 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:22:56,431 - ERROR - [base_events] Task was destroyed but it is pending!
+task: <Task cancelling name='Task-1' coro=<Application.run() done, defined at c:\Users\vlad\Desktop\Parser_project\VisaScraper\src\visascraper\main.py:973> wait_for=<_GatheringFuture pending cb=[Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at C:\Users\vlad\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py:767]>
+2025-09-28 13:30:13,260 - INFO - [main] Запуск начального парсинга...
+2025-09-28 13:30:13,261 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-09-28 13:30:16,647 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:30:16,647 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:30:18,266 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:30:18,269 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:30:18,270 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:30:18,270 - INFO - [base] Added job "notify_approved_users" to job store "default"
+2025-09-28 13:30:18,271 - INFO - [base] Added job "check_birthdays" to job store "default"
+2025-09-28 13:30:18,271 - INFO - [base] Added job "check_visa_expirations" to job store "default"
+2025-09-28 13:30:18,271 - INFO - [base] Scheduler started
+2025-09-28 13:30:18,271 - INFO - [dispatcher] Start polling
+2025-09-28 13:30:18,313 - ERROR - [main] [job_first_two] Критическая ошибка: 'NoneType' object is not subscriptable Пробуем ещё раз
+2025-09-28 13:30:18,398 - INFO - [dispatcher] Run polling for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:30:21,399 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:30:21,399 - INFO - [dispatcher] Polling stopped
+2025-09-28 13:30:21,400 - INFO - [dispatcher] Polling stopped for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:30:21,587 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:30:21,631 - ERROR - [base_events] Task was destroyed but it is pending!
+task: <Task cancelling name='Task-1' coro=<Application.run() done, defined at c:\Users\vlad\Desktop\Parser_project\VisaScraper\src\visascraper\main.py:972> wait_for=<_GatheringFuture pending cb=[Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at C:\Users\vlad\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py:767]>
+2025-09-28 13:30:55,709 - INFO - [main] Запуск начального парсинга...
+2025-09-28 13:30:55,709 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-09-28 13:30:58,975 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:30:58,976 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:31:00,561 - ERROR - [main] [job_first_two] Критическая ошибка: 'NoneType' object is not subscriptable Пробуем ещё раз
+2025-09-28 13:31:00,725 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:31:00,728 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:31:00,728 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:31:00,729 - INFO - [base] Added job "notify_approved_users" to job store "default"
+2025-09-28 13:31:00,729 - INFO - [base] Added job "check_birthdays" to job store "default"
+2025-09-28 13:31:00,730 - INFO - [base] Added job "check_visa_expirations" to job store "default"
+2025-09-28 13:31:00,730 - INFO - [base] Scheduler started
+2025-09-28 13:31:00,730 - INFO - [dispatcher] Start polling
+2025-09-28 13:31:00,854 - INFO - [dispatcher] Run polling for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:31:13,634 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:31:13,634 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:31:15,210 - ERROR - [main] [job_first_two] Критическая ошибка: 'NoneType' object is not subscriptable Пробуем ещё раз
+2025-09-28 13:31:15,218 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:31:15,218 - INFO - [dispatcher] Polling stopped
+2025-09-28 13:31:15,219 - INFO - [dispatcher] Polling stopped for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:31:15,384 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:31:15,427 - ERROR - [base_events] Task was destroyed but it is pending!
+task: <Task cancelling name='Task-1' coro=<Application.run() done, defined at c:\Users\vlad\Desktop\Parser_project\VisaScraper\src\visascraper\main.py:972> wait_for=<_GatheringFuture pending cb=[Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at C:\Users\vlad\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py:767]>
+2025-09-28 13:31:28,672 - INFO - [main] Запуск начального парсинга...
+2025-09-28 13:31:28,672 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-09-28 13:31:31,876 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:31:31,877 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:31:33,677 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:31:33,681 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:31:33,681 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:31:33,682 - INFO - [base] Added job "notify_approved_users" to job store "default"
+2025-09-28 13:31:33,682 - INFO - [base] Added job "check_birthdays" to job store "default"
+2025-09-28 13:31:33,682 - INFO - [base] Added job "check_visa_expirations" to job store "default"
+2025-09-28 13:31:33,683 - INFO - [base] Scheduler started
+2025-09-28 13:31:33,683 - INFO - [dispatcher] Start polling
+2025-09-28 13:31:33,801 - INFO - [dispatcher] Run polling for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:31:33,985 - ERROR - [main] [job_first_two] Критическая ошибка: 'NoneType' object is not subscriptable Пробуем ещё раз
+2025-09-28 13:31:35,843 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:31:35,843 - INFO - [dispatcher] Polling stopped
+2025-09-28 13:31:35,844 - INFO - [dispatcher] Polling stopped for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:31:36,028 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:31:36,073 - ERROR - [base_events] Task was destroyed but it is pending!
+task: <Task cancelling name='Task-1' coro=<Application.run() done, defined at c:\Users\vlad\Desktop\Parser_project\VisaScraper\src\visascraper\main.py:972> wait_for=<_GatheringFuture pending cb=[Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at C:\Users\vlad\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py:767]>
+2025-09-28 13:32:51,346 - INFO - [main] Запуск начального парсинга...
+2025-09-28 13:32:51,346 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-09-28 13:32:54,963 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:32:54,964 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:32:56,360 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:32:56,363 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:32:56,364 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:32:56,364 - INFO - [base] Added job "notify_approved_users" to job store "default"
+2025-09-28 13:32:56,365 - INFO - [base] Added job "check_birthdays" to job store "default"
+2025-09-28 13:32:56,365 - INFO - [base] Added job "check_visa_expirations" to job store "default"
+2025-09-28 13:32:56,365 - INFO - [base] Scheduler started
+2025-09-28 13:32:56,365 - INFO - [dispatcher] Start polling
+2025-09-28 13:32:56,492 - INFO - [dispatcher] Run polling for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:32:56,509 - ERROR - [main] [job_first_two] Критическая ошибка: 'NoneType' object is not subscriptable Пробуем ещё раз
+2025-09-28 13:32:57,947 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:32:57,947 - INFO - [dispatcher] Polling stopped
+2025-09-28 13:32:57,948 - INFO - [dispatcher] Polling stopped for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:32:58,114 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:32:58,157 - ERROR - [base_events] Task was destroyed but it is pending!
+task: <Task cancelling name='Task-1' coro=<Application.run() done, defined at c:\Users\vlad\Desktop\Parser_project\VisaScraper\src\visascraper\main.py:972> wait_for=<_GatheringFuture pending cb=[Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at C:\Users\vlad\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py:767]>
+2025-09-28 13:33:36,098 - INFO - [main] Запуск начального парсинга...
+2025-09-28 13:33:36,099 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-09-28 13:33:38,907 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:33:38,907 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:33:40,498 - ERROR - [main] [job_first_two] Критическая ошибка: 'NoneType' object is not subscriptable Пробуем ещё раз
+2025-09-28 13:33:41,108 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:33:41,110 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:33:41,110 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:33:41,111 - INFO - [base] Added job "notify_approved_users" to job store "default"
+2025-09-28 13:33:41,111 - INFO - [base] Added job "check_birthdays" to job store "default"
+2025-09-28 13:33:41,111 - INFO - [base] Added job "check_visa_expirations" to job store "default"
+2025-09-28 13:33:41,112 - INFO - [base] Scheduler started
+2025-09-28 13:33:41,112 - INFO - [dispatcher] Start polling
+2025-09-28 13:33:41,237 - INFO - [dispatcher] Run polling for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:33:41,893 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:33:41,894 - INFO - [dispatcher] Polling stopped
+2025-09-28 13:33:41,894 - INFO - [dispatcher] Polling stopped for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:33:42,082 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:33:42,125 - ERROR - [base_events] Task was destroyed but it is pending!
+task: <Task cancelling name='Task-1' coro=<Application.run() done, defined at c:\Users\vlad\Desktop\Parser_project\VisaScraper\src\visascraper\main.py:972> wait_for=<_GatheringFuture pending cb=[Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at C:\Users\vlad\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py:767]>
+2025-09-28 13:48:00,008 - INFO - [main] Запуск начального парсинга...
+2025-09-28 13:48:00,009 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-09-28 13:48:03,467 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:48:03,467 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:48:05,023 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:48:05,027 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:48:05,027 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:48:05,028 - INFO - [base] Added job "notify_approved_users" to job store "default"
+2025-09-28 13:48:05,029 - INFO - [base] Added job "check_birthdays" to job store "default"
+2025-09-28 13:48:05,029 - INFO - [base] Added job "check_visa_expirations" to job store "default"
+2025-09-28 13:48:05,029 - INFO - [base] Scheduler started
+2025-09-28 13:48:05,030 - INFO - [dispatcher] Start polling
+2025-09-28 13:48:05,213 - INFO - [dispatcher] Run polling for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:48:15,046 - WARNING - [result_handler] captcha_response = GetTaskResultResponseSer(status='ready', solution={'gRecaptchaResponse': '03AFcWeA55zD9S3DJiZJy6nQpVzH5e1fR1LbyOjczZw64bhlQCaDwEAm6J-zmDIIQuFspiFKNSed1hfeOTvZReH_3xMPvftciyevXEUJiYgojjQ-_DGBP_VvWj_KnkVLdRndL-cjL5b0Z2woZofJgzy4jYBimh_voOj5U93EBHNfN4ttQi-Gzz1zV-Ysy14ImysyTnemKsrEsE5bf4UXBhioxwEN3tHdI1hNla5aVf-VuaotSFePWP_Bvi6cbjHNZPPEtj4kzixsv3kLm-I7_QA1sF7hax7Qo5YQqRPvvEK6AiaPlPwiQUrYE2kvjf5-pRCCW6dGwoQCN0hAJEyA6mpDP8DDrlpj74F3QD02M4_mdAs1tboHjipgX4noJOCjCyinLbRvlBof6iXdVGEPhMaZ4WEGmQPkrPZi_iZT4i1tgoM5BVLLXFZUXGS-gZi7Jb7nGcREVLg4tPymASm-KHPFyKwfbq_7GStdmJMhX9WT7rYuuDVsFvAwM9tGW0qeEhCU1ph_5YlCxVIj9DgC_DFbpytgdm1cQaHywV9QAc895VGmUH3AetFyXiYaq_QtsoQZUBYkDZryADshG-9jy52FuPn5IiIqUAqYnqSU4Q_LNgl6S4VgkzR_KTd2TPZ5GvMhdRYATRcV63HMP93YtNtm-V_KCR_doWJwqW018H7rstlsJCY6jp2jQXA9-5KC0sVO8084XirLN2afWW94XG4i6vL0iTKotCIg', 'token': '03AFcWeA55zD9S3DJiZJy6nQpVzH5e1fR1LbyOjczZw64bhlQCaDwEAm6J-zmDIIQuFspiFKNSed1hfeOTvZReH_3xMPvftciyevXEUJiYgojjQ-_DGBP_VvWj_KnkVLdRndL-cjL5b0Z2woZofJgzy4jYBimh_voOj5U93EBHNfN4ttQi-Gzz1zV-Ysy14ImysyTnemKsrEsE5bf4UXBhioxwEN3tHdI1hNla5aVf-VuaotSFePWP_Bvi6cbjHNZPPEtj4kzixsv3kLm-I7_QA1sF7hax7Qo5YQqRPvvEK6AiaPlPwiQUrYE2kvjf5-pRCCW6dGwoQCN0hAJEyA6mpDP8DDrlpj74F3QD02M4_mdAs1tboHjipgX4noJOCjCyinLbRvlBof6iXdVGEPhMaZ4WEGmQPkrPZi_iZT4i1tgoM5BVLLXFZUXGS-gZi7Jb7nGcREVLg4tPymASm-KHPFyKwfbq_7GStdmJMhX9WT7rYuuDVsFvAwM9tGW0qeEhCU1ph_5YlCxVIj9DgC_DFbpytgdm1cQaHywV9QAc895VGmUH3AetFyXiYaq_QtsoQZUBYkDZryADshG-9jy52FuPn5IiIqUAqYnqSU4Q_LNgl6S4VgkzR_KTd2TPZ5GvMhdRYATRcV63HMP93YtNtm-V_KCR_doWJwqW018H7rstlsJCY6jp2jQXA9-5KC0sVO8084XirLN2afWW94XG4i6vL0iTKotCIg', 'cookies': {'empty': 'true'}}, cost='0.16', ip='37.212.80.103', createTime=1759056485, endTime=1759056486, solveCount=1, taskId=80751314412, balance=None, errorId=0, errorCode=None, errorDescription=None)
+2025-09-28 13:48:16,546 - INFO - [main] [NEXT STEP] переходим к следующему этапу
+2025-09-28 13:48:16,547 - INFO - [main] Начинаем парсинг Stay Permit для аккаунта: ALPHA VISA
+2025-09-28 13:48:58,630 - INFO - [main] Спарсили 10 Stay Permit (аккаунт ALPHA VISA)
+2025-09-28 13:49:05,032 - INFO - [base] Running job "notify_approved_users (trigger: interval[0:01:00], next run at: 2025-09-28 13:50:05 MSK)" (scheduled at 2025-09-28 13:49:05.023077+03:00)
+2025-09-28 13:49:05,158 - INFO - [base] Job "notify_approved_users (trigger: interval[0:01:00], next run at: 2025-09-28 13:50:05 MSK)" executed successfully
+2025-09-28 13:49:21,149 - INFO - [main] Запуск начального парсинга...
+2025-09-28 13:49:21,150 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-09-28 13:49:24,020 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:49:24,020 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:49:25,908 - INFO - [main] [NEXT STEP] переходим к следующему этапу
+2025-09-28 13:49:25,908 - INFO - [main] Начинаем парсинг Stay Permit для аккаунта: ALPHA VISA
+2025-09-28 13:49:26,160 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:49:26,163 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:49:26,164 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:49:26,164 - INFO - [base] Added job "notify_approved_users" to job store "default"
+2025-09-28 13:49:26,165 - INFO - [base] Added job "check_birthdays" to job store "default"
+2025-09-28 13:49:26,165 - INFO - [base] Added job "check_visa_expirations" to job store "default"
+2025-09-28 13:49:26,165 - INFO - [base] Scheduler started
+2025-09-28 13:49:26,165 - INFO - [dispatcher] Start polling
+2025-09-28 13:49:26,294 - INFO - [dispatcher] Run polling for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:49:43,392 - INFO - [main] Спарсили 10 Stay Permit (аккаунт ALPHA VISA)
+2025-09-28 13:49:49,550 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:49:49,550 - INFO - [dispatcher] Polling stopped
+2025-09-28 13:49:49,550 - INFO - [dispatcher] Polling stopped for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:49:49,737 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:49:49,783 - ERROR - [base_events] Task was destroyed but it is pending!
+task: <Task cancelling name='Task-1' coro=<Application.run() done, defined at c:\Users\vlad\Desktop\Parser_project\VisaScraper\src\visascraper\main.py:972> wait_for=<_GatheringFuture pending cb=[Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at C:\Users\vlad\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py:767]>
+2025-09-28 13:50:15,280 - INFO - [main] Запуск начального парсинга...
+2025-09-28 13:50:15,280 - INFO - [main] Запуск задачи для первых двух аккаунтов
+2025-09-28 13:50:18,116 - INFO - [main] Начинаем парсинг для 2 аккаунтов.
+2025-09-28 13:50:18,117 - INFO - [main] Обрабатываем аккаунт ALPHA VISA (1/2)
+2025-09-28 13:50:20,283 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:50:20,286 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:50:20,286 - INFO - [base] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-09-28 13:50:20,287 - INFO - [base] Added job "notify_approved_users" to job store "default"
+2025-09-28 13:50:20,287 - INFO - [base] Added job "check_birthdays" to job store "default"
+2025-09-28 13:50:20,287 - INFO - [base] Added job "check_visa_expirations" to job store "default"
+2025-09-28 13:50:20,287 - INFO - [base] Scheduler started
+2025-09-28 13:50:20,288 - INFO - [dispatcher] Start polling
+2025-09-28 13:50:20,411 - INFO - [dispatcher] Run polling for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:50:29,684 - WARNING - [result_handler] captcha_response = GetTaskResultResponseSer(status='ready', solution={'gRecaptchaResponse': '03AFcWeA4sydUyHFqvO50pjP60KyV97uf3DlrX2yxeLqT5nyal4KQFMxMMXunh2fDMTj6wlNf1hTCJndw2oB-6ekqFpveMpiQ0R_Zk8JpiSa5YXl_qFBUWXmAUXpUVCFenU2CDhmXEFNYTblW31VS6QnmABEEEuWB9Kp5zoneiUVJmvY-EZTNmPOQ5Ihi1IbJVoD914SOf4judYIQSxIasi8wYFJIx1aHPMAYD5eZjIBaf8y4iMumi657uhha-wfQV3cHbsTqqCUOsw-41QknWvAPmkwYyTHcB1OKz3XjjOBf4iEtpdQwt5Dw5TwcFDzcV03WjOG-wCG9Y_-SCteODOpMX7h3lNsIPoPNgBnsabUXFSyNJEzCohG82ZJdUdtT0ZbwRk4Sk1nQ0W2H_cnLQsNoueOu2xSDxDYMHjTOieIX2IKxU7HZ5uovtuSA2EgrMBQsqgJtHk298Syvl7ewlr8L-MMt7tXt6WX5pfKO2bn6iMPpufF-UENG-WRT8XK8pBMnQZq6lcb28shk4Rn2to_j7m5o84mrNoPbTp6InyE8iRQL_rJNu7yby7zTd4x85qxUzJWbShM27ExOS1zVvWw28MKMAxvo7To5stBTPPaco97mvBfOa8-I7ncrY_ubBiNJG06bU7HjLiT0v7DklrOpQgMI-0pTvPpjs2kNL_xaybzHQI1K86f7HzTloRyS0IC5YuuXC8CKS', 'token': '03AFcWeA4sydUyHFqvO50pjP60KyV97uf3DlrX2yxeLqT5nyal4KQFMxMMXunh2fDMTj6wlNf1hTCJndw2oB-6ekqFpveMpiQ0R_Zk8JpiSa5YXl_qFBUWXmAUXpUVCFenU2CDhmXEFNYTblW31VS6QnmABEEEuWB9Kp5zoneiUVJmvY-EZTNmPOQ5Ihi1IbJVoD914SOf4judYIQSxIasi8wYFJIx1aHPMAYD5eZjIBaf8y4iMumi657uhha-wfQV3cHbsTqqCUOsw-41QknWvAPmkwYyTHcB1OKz3XjjOBf4iEtpdQwt5Dw5TwcFDzcV03WjOG-wCG9Y_-SCteODOpMX7h3lNsIPoPNgBnsabUXFSyNJEzCohG82ZJdUdtT0ZbwRk4Sk1nQ0W2H_cnLQsNoueOu2xSDxDYMHjTOieIX2IKxU7HZ5uovtuSA2EgrMBQsqgJtHk298Syvl7ewlr8L-MMt7tXt6WX5pfKO2bn6iMPpufF-UENG-WRT8XK8pBMnQZq6lcb28shk4Rn2to_j7m5o84mrNoPbTp6InyE8iRQL_rJNu7yby7zTd4x85qxUzJWbShM27ExOS1zVvWw28MKMAxvo7To5stBTPPaco97mvBfOa8-I7ncrY_ubBiNJG06bU7HjLiT0v7DklrOpQgMI-0pTvPpjs2kNL_xaybzHQI1K86f7HzTloRyS0IC5YuuXC8CKS', 'cookies': {'empty': 'true'}}, cost='0.16', ip='37.212.80.103', createTime=1759056620, endTime=1759056621, solveCount=1, taskId=80751322908, balance=None, errorId=0, errorCode=None, errorDescription=None)
+2025-09-28 13:50:30,719 - INFO - [main] [NEXT STEP] переходим к следующему этапу
+2025-09-28 13:50:30,719 - INFO - [main] Начинаем парсинг Stay Permit для аккаунта: ALPHA VISA
+2025-09-28 13:50:35,563 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:50:35,563 - INFO - [dispatcher] Polling stopped
+2025-09-28 13:50:35,563 - INFO - [dispatcher] Polling stopped for bot @nalimov_test_bot id=8443851052 - 'nalimov_test'
+2025-09-28 13:50:35,750 - INFO - [main] Получен сигнал завершения. Останавливаем планировщики...
+2025-09-28 13:50:35,796 - ERROR - [base_events] Task was destroyed but it is pending!
+task: <Task cancelling name='Task-1' coro=<Application.run() done, defined at c:\Users\vlad\Desktop\Parser_project\VisaScraper\src\visascraper\main.py:972> wait_for=<_GatheringFuture pending cb=[Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at C:\Users\vlad\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py:767]>

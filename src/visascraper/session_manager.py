@@ -3,6 +3,8 @@ import time
 from curl_cffi import requests
 from bs4 import BeautifulSoup
 from captcha_solver import solve_recaptcha
+from utils.logger import logger as custom_logger
+
 
 def save_value(name, value):
     try:
@@ -23,59 +25,77 @@ def load_session(name: str) -> str | None:
     except FileNotFoundError:
         return None
 
-def login(name: str, password: str) -> str | None:
-    headers = {
-        'Host': 'evisa.imigrasi.go.id',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:139.0) Gecko/20100101 Firefox/139.0',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
-        'Upgrade-Insecure-Requests': '1',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Sec-Fetch-User': '?1',
-        'Priority': 'u=0, i',
-    }
-    session = requests.Session()
+def login(session, name: str, password: str) -> str | None:
+    try:
+        headers = {
+            'Host': 'evisa.imigrasi.go.id',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:139.0) Gecko/20100101 Firefox/139.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Priority': 'u=0, i',
+        }
 
-    response = session.get('https://evisa.imigrasi.go.id/front/login',  headers=headers)
 
-    soup = BeautifulSoup(response.text, 'lxml')
-    recaptcha_key = soup.find('div', class_='g-recaptcha')['data-sitekey']
-    csrf_token = soup.find('input', attrs={'name': 'csrf_token'})['value']
+        response = session.get('https://evisa.imigrasi.go.id/', headers=headers)
+        soup = BeautifulSoup(response.text, 'lxml')
+        menu_token = soup.find('ul', class_='buy-button list-inline mb-0 d-none d-sm-block').find('a')['href']
 
-    if not recaptcha_key:
-        print('Не нашли на сайте капчу, заканчиваем цикл')
-        return None
+        response = session.get(f'https://evisa.imigrasi.go.id{menu_token}',  headers=headers)
+        print('решаем капчу', response)
 
-    captcha_token = solve_recaptcha(recaptcha_key, 'https://evisa.imigrasi.go.id/front/login') 
 
-    if not captcha_token:
-        return None
+        soup = BeautifulSoup(response.text, 'lxml')
+        recaptcha_key = soup.find('div', class_='g-recaptcha')
+        csrf_token = soup.find('input', attrs={'name': 'csrf_token'})
 
-    headers.update({
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Origin': 'https://evisa.imigrasi.go.id', 
-        'Referer': 'https://evisa.imigrasi.go.id/front/login', 
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'same-origin',
-        'Sec-Fetch-User': '?1',
-    })
+        print(f'КАПЧИ {recaptcha_key}; {csrf_token}')
 
-    data = {
-        'csrf_token': csrf_token,
-        '_username': name,
-        '_password': password,
-        'g-recaptcha-response': captcha_token,
-    }
+        recaptcha_key = soup.find('div', class_='g-recaptcha')['data-sitekey']
+        csrf_token = soup.find('input', attrs={'name': 'csrf_token'})['value']
 
-    response = session.post('https://evisa.imigrasi.go.id/front/login',  headers=headers, data=data)
-    session_id = response.cookies.get('PHPSESSID')
-    save_value(name, session_id)
-    return session_id
 
-def check_session(session_id: str) -> bool:
+        print('нашли все что надо')
+        if not recaptcha_key:
+            print('Не нашли на сайте капчу, заканчиваем цикл')
+            return None
+
+        captcha_token = solve_recaptcha(recaptcha_key, 'https://evisa.imigrasi.go.id/front/login') 
+
+        print(f'решили капчу {captcha_token}')
+
+        if not captcha_token:
+            return None
+
+        headers.update({
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Origin': 'https://evisa.imigrasi.go.id', 
+            'Referer': 'https://evisa.imigrasi.go.id/front/login', 
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-User': '?1',
+        })
+
+        data = {
+            'csrf_token': csrf_token,
+            '_username': name,
+            '_password': password,
+            'g-recaptcha-response': captcha_token,
+        }
+
+        response = session.post('https://evisa.imigrasi.go.id/front/login',  headers=headers, data=data)
+        session_id = response.cookies.get('PHPSESSID')
+        save_value(name, session_id)
+        return session_id
+    except Exception as exc:
+        custom_logger.error(f'[LOGIN CAPTCHA] Error when login in account {name} {password} {exc}')
+
+def check_session(session, session_id: str) -> bool:
     cookies = {'PHPSESSID': session_id}
     headers = {
         'Host': 'evisa.imigrasi.go.id',
@@ -121,7 +141,7 @@ def check_session(session_id: str) -> bool:
         # 'Cookie': 'PHPSESSID=pc9ba4o2l1k4moftfo1c602415; dtCookieqlpedpe2=v_4_srv_1_sn_CC87B249DF2919940E5B7C5471E68CE4_perc_100000_ol_0_mul_1_app-3A93092c04db681869_0; _ga=GA1.1.333052217.1750468330; _ga_RLK0ZH5KF3=GS2.1.s1750468330$o1$g0$t1750468330$j60$l0$h0; PHPSESSID=pc9ba4o2l1k4moftfo1c602415',
     }
 
-    response = requests.post(
+    response = session.post(
         'https://evisa.imigrasi.go.id/web/applications/batch/data', 
         cookies=cookies,
         headers=headers,
