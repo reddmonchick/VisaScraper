@@ -46,27 +46,20 @@ def login(session, name: str, password: str) -> str | None:
         menu_token = soup.find('ul', class_='buy-button list-inline mb-0 d-none d-sm-block').find('a')['href']
 
         response = session.get(f'https://evisa.imigrasi.go.id{menu_token}',  headers=headers)
-        print('решаем капчу', response)
-
 
         soup = BeautifulSoup(response.text, 'lxml')
         recaptcha_key = soup.find('div', class_='g-recaptcha')
         csrf_token = soup.find('input', attrs={'name': 'csrf_token'})
 
-        print(f'КАПЧИ {recaptcha_key}; {csrf_token}')
-
         recaptcha_key = soup.find('div', class_='g-recaptcha')['data-sitekey']
         csrf_token = soup.find('input', attrs={'name': 'csrf_token'})['value']
 
 
-        print('нашли все что надо')
         if not recaptcha_key:
             print('Не нашли на сайте капчу, заканчиваем цикл')
             return None
 
         captcha_token = solve_recaptcha(recaptcha_key, 'https://evisa.imigrasi.go.id/front/login') 
-
-        print(f'решили капчу {captcha_token}')
 
         if not captcha_token:
             return None
