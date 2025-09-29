@@ -142,15 +142,16 @@ class StayPermitData:
 class SessionManager:
     """Управление HTTP-сессией с поддержкой прокси."""
     def __init__(self, proxies: str = None):
-        self.session = requests.Session()
-        if proxies:
-            proxies = {
-                'http': f'http://{proxies}',
-                'https': f'http://{proxies}'
-            }
-            self.session.proxies.update(proxies)
+        self.proxies = proxies
 
     def get_session(self) -> requests.Session:
+        self.session = requests.Session()
+        if self.proxies:
+            proxies = {
+                'http': f'http://{self.proxies}',
+                'https': f'http://{self.proxies}'
+            }
+            self.session.proxies.update(proxies)
         return self.session
 
 class YandexDiskUploader:
@@ -521,7 +522,7 @@ class DataParser:
 
                     result_data = response.json().get('data', [])
                     if not result_data:
-                        custom_logger.info(f"Данные Stay Permit для {name} закончились (offset={offset}).")
+                        custom_logger.info(f"Данные Stay Permit для {name} закончились (offset={offset})")
                         break
 
                     items_in_batch = 0
