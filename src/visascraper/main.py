@@ -803,8 +803,8 @@ class JobScheduler:
                 custom_logger.warning("Недостаточно аккаунтов для выполнения задачи 'первых двух'")
                 return
 
-            names = [row[0] for row in all_values[1:3]] # Берем только 2 и 3 строки (индексы 1 и 2)
-            passwords = [row[1] for row in all_values[1:3]]
+            names = [row[0] for row in all_values[0:2]] # Берем только 2 и 3 строки (индексы 1 и 2)
+            passwords = [row[1] for row in all_values[0:2]]
 
             # Парсим ТОЛЬКО эти аккаунты
             batch_app, batch_mgr, stay = self.data_parser.parse_accounts(names, passwords)
@@ -832,7 +832,7 @@ class JobScheduler:
                 return
 
             # Берем все, начиная с 4-й строки (индекс 3)
-            remaining_accounts = all_values[3:]
+            remaining_accounts = all_values[2:]
             names = [row[0] for row in remaining_accounts]
             passwords = [row[1] for row in remaining_accounts]
 
