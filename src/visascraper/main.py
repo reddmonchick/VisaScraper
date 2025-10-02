@@ -646,7 +646,6 @@ class GoogleSheetsManager:
     def _init_client(self):
         """Инициализирует клиент gspread."""
         try:
-            # Проверка наличия файла учетных данных
             if not os.path.exists(self.credentials_path):
                  custom_logger.critical(f"Файл учетных данных Google Sheets не найден: {self.credentials_path}")
                  raise FileNotFoundError(f"Файл учетных данных Google Sheets не найден: {self.credentials_path}")
@@ -673,13 +672,11 @@ class GoogleSheetsManager:
         manager_data: List[List[str]],
         stay_data: List[List[str]]):
         """
-        Записывает данные в соответствующие листы Google Sheets.
-        Включает фильтрацию по аккаунтам и сортировку Batch Application по payment_date.
-        Добавлена обработка больших объемов данных и повторные попытки.
+        Записывает данные в соответствующие листы, обновляя только затронутые аккаунты.
         """
         max_retries = 3
-        base_delay = 5 # Базовая задержка в секундах
-        chunk_size = 500 # Максимальное количество строк для отправки за раз
+        base_delay = 5
+        chunk_size = 500
 
         for attempt in range(1, max_retries + 1):
             try:
@@ -688,242 +685,189 @@ class GoogleSheetsManager:
 
                 spreadsheet = self.gc.open_by_key(spreadsheet_key)
                 
-                # Получаем список аккаунтов из новых данных Batch Application
-                first_two_accounts = list(set(row[IDX_BA_ACCOUNT] for row in batch_app_data)) if batch_app_data else []
+                # ИЗМЕНЕНИЕ: Получаем список аккаунтов, которые мы сейчас обновляем.
+                # Это могут быть либо первые два, либо остальные.
+                accounts_to_process = list(set(row[IDX_BA_ACCOUNT] for row in batch_app_data)) if batch_app_data else []
+                custom_logger.info(f"Обновляем данные для аккаунтов: {accounts_to_process}")
 
                 # --- Batch Application ---
                 worksheet_batch = spreadsheet.worksheet('Batch Application')
                 all_batch_data = worksheet_batch.get_all_values()
                 header_batch = all_batch_data[0] if all_batch_data else []
                 existing_batch_data = all_batch_data[1:] if len(all_batch_data) > 1 else []
+                
+                # Фильтруем: оставляем только те строки, аккаунты которых мы НЕ обновляем сейчас
                 filtered_batch_data = [
-                    row for row in existing_batch_data if row[IDX_BA_ACCOUNT] not in first_two_accounts
+                    row for row in existing_batch_data if len(row) > IDX_BA_ACCOUNT and row[IDX_BA_ACCOUNT] not in accounts_to_process
                 ]
-                # Сортировка новых данных Batch Application по payment_date (индекс 6)
+                
+                # Сортировка новых данных
                 try:
                     sorted_new_batch_data = sorted(batch_app_data, key=lambda row: self._parse_date_for_sorting(row[6]), reverse=True)
-                    custom_logger.info("✅ BatchApplication данные отсортированы по payment_date.")
-                except Exception as sort_error:
-                    custom_logger.warning(f"⚠️ Ошибка при сортировке BatchApplication: {sort_error}. Данные не отсортированы.")
+                except Exception:
                     sorted_new_batch_data = batch_app_data
 
-                updated_batch_data = [header_batch] + filtered_batch_data + sorted_new_batch_data
+                # Соединяем старые нетронутые данные с новыми отсортированными
+                updated_batch_data = filtered_batch_data + sorted_new_batch_data
                 
-                # Очищаем лист
                 worksheet_batch.clear()
-                
-                # Записываем данные по частям
-                if updated_batch_data and any(updated_batch_data):
-                    self._append_rows_in_chunks(worksheet_batch, updated_batch_data, chunk_size)
+                # Сначала записываем заголовок, потом все данные
+                self._append_rows_in_chunks(worksheet_batch, [header_batch] + updated_batch_data, chunk_size)
                 custom_logger.info("✅ Данные Batch Application обновлены в Google Sheets")
 
-                # --- Manager Worksheet ---
+                # --- Manager Worksheet --- (аналогичная логика)
                 worksheet_manager = spreadsheet.worksheet('Batch Application(Manager)')
                 all_mgr_data = worksheet_manager.get_all_values()
                 header_mgr = all_mgr_data[0] if all_mgr_data else []
                 existing_mgr_data = all_mgr_data[1:] if len(all_mgr_data) > 1 else []
                 filtered_mgr_data = [
-                    row for row in existing_mgr_data if row[IDX_MGR_ACCOUNT] not in first_two_accounts
+                    row for row in existing_mgr_data if len(row) > IDX_MGR_ACCOUNT and row[IDX_MGR_ACCOUNT] not in accounts_to_process
                 ]
-                # Сортировка новых данных Manager по payment_date (индекс 2)
                 try:
                     sorted_new_mgr_data = sorted(manager_data, key=lambda row: self._parse_date_for_sorting(row[IDX_MGR_PAYMENT_DATE]), reverse=True)
-                    custom_logger.info("✅ BatchApplication(Manager) данные отсортированы по payment_date.")
-                except Exception as sort_error:
-                    custom_logger.warning(f"⚠️ Ошибка при сортировке BatchApplication(Manager): {sort_error}. Данные не отсортированы.")
+                except Exception:
                     sorted_new_mgr_data = manager_data
 
-                updated_mgr_data = [header_mgr] + filtered_mgr_data + sorted_new_mgr_data
+                updated_mgr_data = filtered_mgr_data + sorted_new_mgr_data
                 
-                # Очищаем лист
                 worksheet_manager.clear()
-                
-                # Записываем данные по частям
-                if updated_mgr_data and any(updated_mgr_data):
-                    self._append_rows_in_chunks(worksheet_manager, updated_mgr_data, chunk_size)
+                self._append_rows_in_chunks(worksheet_manager, [header_mgr] + updated_mgr_data, chunk_size)
                 custom_logger.info("✅ Данные Batch Application(Manager) обновлены в Google Sheets")
 
-                # --- Stay Permit ---
+                # --- Stay Permit --- (аналогичная логика)
                 worksheet_stay = spreadsheet.worksheet('StayPermit')
                 all_stay_data = worksheet_stay.get_all_values()
                 header_stay = all_stay_data[0] if all_stay_data else []
                 existing_stay_data = all_stay_data[1:] if len(all_stay_data) > 1 else []
                 filtered_stay_data = [
-                    row for row in existing_stay_data if row[IDX_SP_ACCOUNT] not in first_two_accounts
+                    row for row in existing_stay_data if len(row) > IDX_SP_ACCOUNT and row[IDX_SP_ACCOUNT] not in accounts_to_process
                 ]
 
-                updated_stay_data = [header_stay] + filtered_stay_data + stay_data
+                updated_stay_data = filtered_stay_data + stay_data
                 
-                # Очищаем лист
                 worksheet_stay.clear()
-                
-                # Записываем данные по частям
-                if updated_stay_data and any(updated_stay_data):
-                    self._append_rows_in_chunks(worksheet_stay, updated_stay_data, chunk_size)
+                self._append_rows_in_chunks(worksheet_stay, [header_stay] + updated_stay_data, chunk_size)
                 custom_logger.info("✅ Данные Stay Permit обновлены в Google Sheets")
                 
-                # Если все прошло успешно, выходим из цикла попыток
                 return 
 
-            #except (requests.exceptions.ConnectionError, gspread.exceptions.APIError) as e:
             except Exception as e:
-                custom_logger.warning(f"⚠️ Попытка {attempt}/{max_retries} записи в Google Sheets не удалась из-за ошибки: {e}")
+                custom_logger.warning(f"⚠️ Попытка {attempt}/{max_retries} записи в Google Sheets не удалась: {e}\n{format_exc()}")
                 if attempt < max_retries:
-                    delay = base_delay * (2 ** (attempt - 1)) # Экспоненциальная задержка
+                    delay = base_delay * (2 ** (attempt - 1))
                     custom_logger.info(f"Повтор через {delay} секунд...")
                     time.sleep(delay)
                 else:
                     custom_logger.error(f"❌ Все {max_retries} попытки записи в Google Sheets не удались.")
-                    raise # Пробрасываем ошибку после исчерпания попыток
-           # except Exception as e:
-                # Для других неожиданных ошибок, сразу пробрасываем
-                #custom_logger.error(f"❌ Неожиданная ошибка при записи в Google Sheets: {e}")
-                #raise
+                    raise
 
-    def _append_rows_in_chunks(self, worksheet:  List[List[str]],data, chunk_size: int):
-        """
-        Добавляет данные в лист Google Sheets порциями, чтобы избежать ошибок из-за большого объема.
-        """
-        custom_logger.info(f"Начинаем запись данных в лист '{worksheet.title}' по частям. Всего строк: {len(data)}")
+    def _append_rows_in_chunks(self, worksheet, data, chunk_size: int):
+        """Добавляет данные в лист Google Sheets порциями."""
+        if not data or not any(data):
+            custom_logger.warning(f"Нет данных для записи в лист '{worksheet.title}'.")
+            return
+
+        custom_logger.info(f"Начинаем запись {len(data)} строк в лист '{worksheet.title}'...")
         for i in range(0, len(data), chunk_size):
             chunk = data[i:i + chunk_size]
-            # Небольшая задержка между запросами может помочь
             if i > 0: 
                 time.sleep(1) 
             try:
-                worksheet.append_rows(chunk)
-                custom_logger.debug(f"Записана порция {i//chunk_size + 1}: строки {i+1}-{min(i+chunk_size, len(data))}")
-            except (requests.exceptions.ConnectionError, gspread.exceptions.APIError) as e:
-                # Если ошибка произошла при записи части, пробрасываем её выше для обработки retry в write_to_sheet
-                custom_logger.error(f"❌ Ошибка при записи порции {i//chunk_size + 1} в лист '{worksheet.title}': {e}")
-                raise 
+                worksheet.append_rows(chunk, value_input_option='USER_ENTERED')
+                custom_logger.debug(f"Записана порция {i//chunk_size + 1} в '{worksheet.title}'")
             except Exception as e:
-                custom_logger.error(f"❌ Неожиданная ошибка при записи порции {i//chunk_size + 1} в лист '{worksheet.title}': {e}")
+                custom_logger.error(f"❌ Ошибка при записи порции в лист '{worksheet.title}': {e}")
                 raise
         custom_logger.info(f"✅ Запись данных в лист '{worksheet.title}' завершена.") 
 
 class JobScheduler:
     """Управление задачами планировщика."""
-    def __init__(self, gs_manager: GoogleSheetsManager, data_parser: DataParser): # Добавлен data_parser
+    def __init__(self, gs_manager: GoogleSheetsManager, data_parser: DataParser):
         self.gs_manager = gs_manager
-        self.data_parser = data_parser # Сохраняем экземпляр DataParser
+        self.data_parser = data_parser
         self.scheduler = None
-        self.cached_batch_application_data: List[List[str]] = []
-        self.cached_manager_data: List[List[str]] = []
-        self.cached_stay_permit_data: List[List[str]] = []
+        # УБРАЛИ ВЕСЬ КЭШ, ОН БЫЛ ИСТОЧНИКОМ ОШИБКИ
+        # self.cached_batch_application_data ... и т.д.
 
     def job_first_two(self):
-        """Задача для парсинга первых двух аккаунтов."""
+        """Задача для парсинга ПЕРВЫХ ДВУХ аккаунтов (для планировщика)."""
         custom_logger.info("Запуск задачи для первых двух аккаунтов")
-        attempt = 0
-        max_attempts = 3
-        while attempt < max_attempts:
-            try:
-                if not self.gs_manager.gc:
-                    self.gs_manager._init_client()
-                    
-                spreadsheet_batch = self.gs_manager.gc.open_by_key(GS_BATCH_SHEET_ID)
-                worksheet_account = spreadsheet_batch.worksheet('Аккаунты')
-                names = worksheet_account.col_values(1) # Пропускаем заголовок
-                passwords = worksheet_account.col_values(2)
+        try:
+            if not self.gs_manager.gc:
+                self.gs_manager._init_client()
+                
+            spreadsheet_batch = self.gs_manager.gc.open_by_key(GS_BATCH_SHEET_ID)
+            worksheet_account = spreadsheet_batch.worksheet('Аккаунты')
+            all_values = worksheet_account.get_all_values()
+            if len(all_values) < 2:
+                custom_logger.warning("Недостаточно аккаунтов для выполнения задачи 'первых двух'")
+                return
 
-                if len(names) < 2:
-                    custom_logger.warning("Недостаточно аккаунтов для выполнения задачи первых двух")
-                    return # Выходим, если аккаунтов меньше 2
+            names = [row[0] for row in all_values[1:3]] # Берем только 2 и 3 строки (индексы 1 и 2)
+            passwords = [row[1] for row in all_values[1:3]]
 
-                first_two_names = names[:2]
-                first_two_passwords = passwords[:2]
+            # Парсим ТОЛЬКО эти аккаунты
+            batch_app, batch_mgr, stay = self.data_parser.parse_accounts(names, passwords)
 
+            # Записываем в Google Sheets ТОЛЬКО их данные
+            self.gs_manager.write_to_sheet(GS_BATCH_SHEET_ID, batch_app, batch_mgr, stay)
+            custom_logger.info("✅ Задача для первых двух аккаунтов успешно выполнена.")
 
-                # Вызов парсинга через DataParser ---
-                batch_app, batch_mgr, stay = self.data_parser.parse_accounts(first_two_names, first_two_passwords)
-
-                # Кэшируем данные
-                self.cached_batch_application_data = batch_app
-                self.cached_manager_data = batch_mgr
-                self.cached_stay_permit_data = stay
-
-                # Записываем в Google Sheets
-                self.gs_manager.write_to_sheet(GS_BATCH_SHEET_ID, batch_app, batch_mgr, stay)
-
-            except Exception as e:
-                custom_logger.error(f"[job_first_two] Критическая ошибка: {e} Пробуем ещё раз")
-                if attempt >= max_attempts:
-                    custom_logger.warning(f"[job_first_two] Критическая ошибка {e} заканчиваем попытки")
-                    return []
-                    break
-                time.sleep(10)
+        except Exception as e:
+            custom_logger.error(f"[job_first_two] Критическая ошибка: {e}\n{format_exc()}")
 
     def job_others(self):
-        """Задача для парсинга остальных аккаунтов."""
+        """Задача для парсинга ОСТАЛЬНЫХ аккаунтов (для вызова из бота)."""
         custom_logger.info("Запуск задачи для остальных аккаунтов")
-        attempt = 0
-        max_attempts = 3
-        while attempt < max_attempts:
-            try:
-                if not self.gs_manager.gc:
-                    self.gs_manager._init_client()
-                    
-                spreadsheet_batch = self.gs_manager.gc.open_by_key(GS_BATCH_SHEET_ID)
-                worksheet_account = spreadsheet_batch.worksheet('Аккаунты')
-                names = worksheet_account.col_values(1) # Пропускаем заголовок
-                passwords = worksheet_account.col_values(2)
+        try:
+            if not self.gs_manager.gc:
+                self.gs_manager._init_client()
+                
+            spreadsheet_batch = self.gs_manager.gc.open_by_key(GS_BATCH_SHEET_ID)
+            worksheet_account = spreadsheet_batch.worksheet('Аккаунты')
+            all_values = worksheet_account.get_all_values()
+            
+            if len(all_values) <= 3: # Если аккаунтов 2 или меньше (1 заголовок + 2 акка)
+                custom_logger.info("Нет 'остальных' аккаунтов для обработки.")
+                return
 
-                if len(names) <= 2:
-                    custom_logger.info("Недостаточно аккаунтов для выполнения полного цикла")
-                    # Все данные уже обработаны job_first_two
-                    # Записываем кэшированные данные, если они есть
-                    if self.cached_batch_application_data or self.cached_manager_data or self.cached_stay_permit_data:
-                        self.gs_manager.write_to_sheet(
-                            GS_BATCH_SHEET_ID,
-                            self.cached_batch_application_data,
-                            self.cached_manager_data,
-                            self.cached_stay_permit_data
-                        )
-                    return # Выходим, если аккаунтов <= 2
+            # Берем все, начиная с 4-й строки (индекс 3)
+            remaining_accounts = all_values[3:]
+            names = [row[0] for row in remaining_accounts]
+            passwords = [row[1] for row in remaining_accounts]
 
-                remaining_names = names[2:]
-                remaining_passwords = passwords[2:]
+            if not names:
+                custom_logger.info("Не найдено 'остальных' аккаунтов для парсинга.")
+                return
 
-                # Вызов парсинга через DataParser ---
-                batch_app_new, batch_mgr_new, stay_new = self.data_parser.parse_accounts(remaining_names, remaining_passwords)
+            # Парсим ТОЛЬКО эти аккаунты
+            batch_app, batch_mgr, stay = self.data_parser.parse_accounts(names, passwords)
 
-                # Объединяем кэшированные данные с новыми
-                full_batch = self.cached_batch_application_data + batch_app_new
-                full_manager = self.cached_manager_data + batch_mgr_new
-                full_stay = self.cached_stay_permit_data + stay_new
+            # Записываем в Google Sheets ТОЛЬКО их данные
+            self.gs_manager.write_to_sheet(GS_BATCH_SHEET_ID, batch_app, batch_mgr, stay)
+            custom_logger.info("✅ Задача для остальных аккаунтов успешно выполнена.")
 
-                # Записываем полный набор данных в Google Sheets
-                self.gs_manager.write_to_sheet(GS_BATCH_SHEET_ID, full_batch, full_manager, full_stay)
-                break
-
-            except Exception as e:
-                custom_logger.error(f"[job_others] Критическая ошибка: {e} Пробуем ещё раз")
-                if attempt >= max_attempts:
-                    custom_logger.warning(f"[job_others] Критическая ошибка {e} заканчиваем попытки")
-                    return []
-                    break
-                time.sleep(10)
+        except Exception as e:
+            custom_logger.error(f"[job_others] Критическая ошибка: {e}\n{format_exc()}")
 
 
     def start_scheduler(self):
-        """Запускает планировщик задач парсинга."""
-        global scheduler_jobs # Для совместимости с shutdown_handler
+        """Запускает планировщик задач парсинга (только для первых двух)."""
+        global scheduler_jobs
         self.scheduler = BackgroundScheduler(
             timezone=ZoneInfo("Europe/Moscow"),
             executors={'default': ThreadPoolExecutor(2)}
         )
-        # Передача методов экземпляра
         self.scheduler.add_job(
-            self.job_first_two,
+            self.job_first_two, # В расписании только эта задача
             'interval',
             minutes=BATCH_PARSE_INTERVAL_MINUTES,
             coalesce=True,
             misfire_grace_time=60 * 5
         )
         self.scheduler.start()
-        scheduler_jobs = self.scheduler # Для совместимости с shutdown_handler
-        custom_logger.info("Планировщик парсинга запущен")
+        scheduler_jobs = self.scheduler
+        custom_logger.info("Планировщик парсинга запущен (только для первых двух аккаунтов)")
 
 class BotRunner:
     """Запуск и управление Telegram ботом."""
@@ -968,7 +912,7 @@ class Application:
         custom_logger.info("Запуск начального парсинга...")
 
         self.job_scheduler.job_first_two()
-        self.job_scheduler.job_others()
+        #self.job_scheduler.job_others()
 
     async def run(self):
         """Асинхронная точка входа для запуска всего приложения."""
