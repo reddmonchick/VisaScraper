@@ -666,14 +666,7 @@ class GoogleSheetsManager:
             custom_logger.warning(f"Не удалось преобразовать дату '{date_str}' для сортировки.")
             return date.min
 
-    def write_to_sheet(self,
-        spreadsheet_key: str,
-        batch_app_data: List[List[str]],
-        manager_data: List[List[str]],
-        stay_data: List[List[str]]):
-        """
-        Записывает данные в соответствующие листы, обновляя только затронутые аккаунты.
-        """
+    def write_to_sheet(self, spreadsheet_key: str, batch_app_data: List[List[str]], manager_data: List[List[str]], stay_data: List[List[str]]):
         max_retries = 3
         base_delay = 5
         chunk_size = 500
@@ -685,62 +678,93 @@ class GoogleSheetsManager:
 
                 spreadsheet = self.gc.open_by_key(spreadsheet_key)
                 
-                # ИЗМЕНЕНИЕ: Получаем список аккаунтов, которые мы сейчас обновляем.
-                # Это могут быть либо первые два, либо остальные.
                 accounts_to_process = list(set(row[IDX_BA_ACCOUNT] for row in batch_app_data)) if batch_app_data else []
                 custom_logger.info(f"Обновляем данные для аккаунтов: {accounts_to_process}")
 
                 # --- Batch Application ---
+                header_batch = ['Batch No', 'Register Number', 'Full Name', 'Date of Birth', 'Visitor Visa Number', 'Passport Number', 'Payment Date', 'Visa Type', 'Status', 'Action Link', 'Account']  # Фиксированный заголовок
+                num_columns_batch = len(header_batch)
+
                 worksheet_batch = spreadsheet.worksheet('Batch Application')
                 all_batch_data = worksheet_batch.get_all_values()
-                header_batch = all_batch_data[0] if all_batch_data else []
-                existing_batch_data = all_batch_data[1:] if len(all_batch_data) > 1 else []
-                
-                # Фильтруем: оставляем только те строки, аккаунты которых мы НЕ обновляем сейчас
+                existing_batch_data = all_batch_data[1:] if len(all_batch_data) > 1 else []  # Игнорируем старый заголовок
+
+                # Нормализуем старые строки: удаляем ведущие '', обрезаем/паддим до num_columns_batch
+                normalized_existing = []
+                for row in existing_batch_data:
+                    # Удаляем ведущие ''
+                    while row and row[0] == '':
+                        row.pop(0)
+                    # Обрезаем если длиннее, паддим '' если короче
+                    if len(row) > num_columns_batch:
+                        row = row[:num_columns_batch]
+                    elif len(row) < num_columns_batch:
+                        row += [''] * (num_columns_batch - len(row))
+                    normalized_existing.append(row)
+
+                # Фильтруем (теперь len(row) == num_columns_batch, но для safety)
                 filtered_batch_data = [
-                    row for row in existing_batch_data if len(row) > IDX_BA_ACCOUNT and row[IDX_BA_ACCOUNT] not in accounts_to_process
+                    row for row in normalized_existing if len(row) == num_columns_batch and row[IDX_BA_ACCOUNT] not in accounts_to_process
                 ]
                 
-                # Сортировка новых данных
-                try:
-                    sorted_new_batch_data = sorted(batch_app_data, key=lambda row: self._parse_date_for_sorting(row[6]), reverse=True)
-                except Exception:
-                    sorted_new_batch_data = batch_app_data
-
-                # Соединяем старые нетронутые данные с новыми отсортированными
+                sorted_new_batch_data = sorted(batch_app_data, key=lambda row: self._parse_date_for_sorting(row[6]), reverse=True)
+                
                 updated_batch_data = filtered_batch_data + sorted_new_batch_data
                 
                 worksheet_batch.clear()
-                # Сначала записываем заголовок, потом все данные
                 self._append_rows_in_chunks(worksheet_batch, [header_batch] + updated_batch_data, chunk_size)
                 custom_logger.info("✅ Данные Batch Application обновлены в Google Sheets")
 
-                # --- Manager Worksheet --- (аналогичная логика)
+                # --- Batch Application(Manager) --- (аналогично, фиксированный заголовок)
+                header_mgr = ['Full Name', 'Visa Type', 'Payment Date', 'Status', 'Action Link', 'Account']
+                num_columns_mgr = len(header_mgr)
+
                 worksheet_manager = spreadsheet.worksheet('Batch Application(Manager)')
                 all_mgr_data = worksheet_manager.get_all_values()
-                header_mgr = all_mgr_data[0] if all_mgr_data else []
                 existing_mgr_data = all_mgr_data[1:] if len(all_mgr_data) > 1 else []
-                filtered_mgr_data = [
-                    row for row in existing_mgr_data if len(row) > IDX_MGR_ACCOUNT and row[IDX_MGR_ACCOUNT] not in accounts_to_process
-                ]
-                try:
-                    sorted_new_mgr_data = sorted(manager_data, key=lambda row: self._parse_date_for_sorting(row[IDX_MGR_PAYMENT_DATE]), reverse=True)
-                except Exception:
-                    sorted_new_mgr_data = manager_data
 
+                normalized_mgr = []  # Аналогичная нормализация
+                for row in existing_mgr_data:
+                    while row and row[0] == '':
+                        row.pop(0)
+                    if len(row) > num_columns_mgr:
+                        row = row[:num_columns_mgr]
+                    elif len(row) < num_columns_mgr:
+                        row += [''] * (num_columns_mgr - len(row))
+                    normalized_mgr.append(row)
+
+                filtered_mgr_data = [
+                    row for row in normalized_mgr if len(row) == num_columns_mgr and row[IDX_MGR_ACCOUNT] not in accounts_to_process
+                ]
+                
+                sorted_new_mgr_data = sorted(manager_data, key=lambda row: self._parse_date_for_sorting(row[IDX_MGR_PAYMENT_DATE]), reverse=True)
+                
                 updated_mgr_data = filtered_mgr_data + sorted_new_mgr_data
                 
                 worksheet_manager.clear()
                 self._append_rows_in_chunks(worksheet_manager, [header_mgr] + updated_mgr_data, chunk_size)
                 custom_logger.info("✅ Данные Batch Application(Manager) обновлены в Google Sheets")
 
-                # --- Stay Permit --- (аналогичная логика)
+                # --- Stay Permit --- (аналогично)
+                header_stay = ['Name', 'Type of Stay Permit', 'Visa Type', 'Arrival Date', 'Issue Date', 'Expired Date', 'Status', 'Action Link', 'Passport Number', 'Account']
+                num_columns_stay = len(header_stay)
+
                 worksheet_stay = spreadsheet.worksheet('StayPermit')
                 all_stay_data = worksheet_stay.get_all_values()
-                header_stay = all_stay_data[0] if all_stay_data else []
                 existing_stay_data = all_stay_data[1:] if len(all_stay_data) > 1 else []
+
+                normalized_stay = []
+                for row in existing_stay_data:
+                    while row and row[0] == '':
+                        row.pop(0)
+                    if len(row) > num_columns_stay:
+                        row = row[:num_columns_stay]
+                    elif len(row) < num_columns_stay:
+                        row += [''] * (num_columns_stay - len(row))
+                    normalized_stay.append(row)
+
                 filtered_stay_data = [
-                    row for row in existing_stay_data if len(row) > IDX_SP_ACCOUNT and row[IDX_SP_ACCOUNT] not in accounts_to_process
+                    row for row in normalized_stay if len(row) == num_columns_stay and row[IDX_SP_ACCOUNT] not in accounts_to_process
                 ]
 
                 updated_stay_data = filtered_stay_data + stay_data
