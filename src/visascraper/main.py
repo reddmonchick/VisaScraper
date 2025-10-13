@@ -412,11 +412,21 @@ class DataParser:
                             try:
                                 detail_response = self.session_manager.get_session().get(detail_link)
                                 detail_result = detail_response.text
-                                date_birth = detail_result.split('Date of Birth')[-1].split('</small')[0].split('<small>')[-1]
+                                soup = BeautifulSoup(detail_result, 'html.parser')
+                                birth_label = soup.find(text='Date of Birth')  # Находим текст лейбла
+                                if birth_label:
+                                    next_small = birth_label.find_next('small')  # Следующий <small>
+                                    if next_small:
+                                        date_birth = next_small.text.strip()
+                                    else:
+                                        date_birth = ''
+                                else:
+                                    date_birth = ''
                                 if date_birth.count('/') != 2:
                                     date_birth = ''
                             except Exception as ex:
                                 custom_logger.error(f'Ошибка при парсинге дня рождения клиента {detail_link}: {ex}')
+                                date_birth = ''
 
                             # Создаем объект данных
                             batch_obj = BatchApplicationData(
@@ -534,7 +544,7 @@ class DataParser:
                                 continue
                             reg_number = reg_number_raw.split("'>")[-1].split("</a>")[0]
 
-                            full_name = safe_get(item_data, 'full_name', '')
+                            full_name = safe_get(item_data, 'full_name', 'No name')
                             type_permit = safe_get(item_data, 'type_of_staypermit', '')
                             type_visa = safe_get(item_data, 'type_of_visa', '')
                             start_date = safe_get(item_data, 'start_date', '')

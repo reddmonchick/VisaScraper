@@ -46,7 +46,7 @@ def save_or_update_batch_data(db: Session, data_list: list):
             existing_app.full_name = item_data.get("full_name")
             existing_app.batch_no = item_data.get("batch_no")
             existing_app.register_number = item_data.get("register_number")
-            existing_app.visitor_visa_number = item_data.get('')
+            existing_app.visitor_visa_number = item_data.get("visitor_visa_number")
             existing_app.passport_number = item_data.get("passport_number")
             existing_app.payment_date = item_data.get("payment_date")
             existing_app.visa_type = item_data.get("visa_type")
@@ -164,43 +164,21 @@ def search_by_passport(db: Session, search_input: str):
         
         return results
 
-def search_by_stay_permit(db: Session, search_input: str):
-    search_input = search_input.strip()
-    logger.info(f"Входной запрос для поиска по месту жительства: '{search_input}'")
+def search_by_stay_permit(db: Session, passport_number_input: str):
+    """
+    Ищет записи StayPermit ТОЛЬКО по номеру паспорта.
+    """
+    # Убираем лишние пробелы и приводим к верхнему регистру
+    passport_number = passport_number_input.strip().upper()
+    logger.info(f"Поиск StayPermit по номеру паспорта: '{passport_number}'")
 
-    # Ищем ПЕРВУЮ последовательность, содержащую хотя бы одну цифру — скорее всего это номер паспорта
-    passport_match = re.search(r'\b(?=\w*\d)[A-Z0-9-]{5,}\b', search_input)
+    if not passport_number:
+        return []
 
-    passport_number = passport_match.group(0) if passport_match else None
-    logger.info(f"Извлеченный номер паспорта: '{passport_number}'")
+    # Ищем записи, где номер паспорта точно совпадает с введенным значением
+    query = db.query(StayPermit).filter(StayPermit.passport_number == passport_number)
 
-    # Убираем номер паспорта из строки, чтобы осталось только имя
-    if passport_number:
-        name_part = re.sub(r'\b' + re.escape(passport_number) + r'\b\s*', '', search_input).strip()
-    else:
-        name_part = search_input
-    logger.info(f"Извлеченная часть имени: '{name_part}'")
-
-    # Разделяем имя на части
-    name_parts = list(set(filter(None, re.split(r'\s+', name_part.upper()))))
-    logger.info(f"Части имени: {name_parts}")
-
-    # Формируем SQL-запрос
-    query = db.query(StayPermit)
-
-    # Фильтруем по имени, если есть части имени
-    if name_parts and passport_number:
-        name_filters = [StayPermit.name.ilike(f"%{part}%") for part in name_parts]
-        query = query.filter(or_(*name_filters))
-        query = query.filter(or_(
-            StayPermit.passport_number == passport_number,
-            StayPermit.passport_number.ilike(f"%{passport_number}%")
-        ))
-
-
-        results = query.all()
-        logger.info(f"Найдено записей: {len(results)}")
-        for result in results:
-            logger.info(f"Результат: {result.__dict__}")
-        
-        return results
+    results = query.all()
+    logger.info(f"Найдено записей для паспорта '{passport_number}': {len(results)}")
+    
+    return results
