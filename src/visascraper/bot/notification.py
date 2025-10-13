@@ -72,6 +72,47 @@ async def notify_approved_users():
     finally:
         db.close()
 
+async def notify_approved_stay_permits():
+    db = SessionLocal()
+    print('Запустили крон: notify_approved_stay_permits')
+    try:
+        # Запрашиваем все разрешения на пребывание (StayPermit)
+        permits = db.query(StayPermit).all()
+        for permit in permits:
+            # Основное условие: статус стал "Approved", а предыдущий статус был другим (или не был установлен)
+            if permit.status == "Approved" and permit.last_status != "Approved":
+                
+                # Формируем путь к локальному PDF файлу
+                file_path = f"src/temp/{permit.reg_number}_stay_permit.pdf"
+                document = FSInputFile(file_path)
+
+                # Формируем текст уведомления
+                text = (
+                    f"🎉 ITK (Stay Permit) одобрен!\n"
+                    f"Имя: {permit.name}\n"
+                    f"Статус: {permit.status}\n"
+                    f"Номер паспорта: {permit.passport_number}\n"
+                    f"Тип разрешения: {permit.type_of_staypermit}"
+                )
+                
+                # Отправляем сообщение с документом
+                await send_telegram_message(text, document=document)
+                
+                # Обновляем last_status, чтобы не отправлять повторно
+                permit.last_status = "Approved"
+                db.commit()
+
+            # Условие сброса: если статус изменился с "Approved" на любой другой
+            elif permit.status != "Approved" and permit.last_status == "Approved":
+                permit.last_status = permit.status
+                db.commit()
+
+    except Exception as e:
+        print(f"❌ Ошибка в notify_approved_stay_permits: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
 
 # === 2. Проверка дней рождения ===
 async def check_birthdays():

@@ -42,3 +42,4 @@ class StayPermit(Base):
     status = Column(String)
     action_link = Column(String)
     account = Column(String)
+    last_status = Column(String, default=None)

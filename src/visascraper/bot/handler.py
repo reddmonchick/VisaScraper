@@ -165,16 +165,16 @@ async def process_passport_input(message: Message, state: FSMContext):
 
     for result in results:
         info = f"""
-Батч номер: {result.batch_no}
-Рег. номер: {result.register_number}
-Полное имя: {result.full_name}
-Номер визы: {result.visitor_visa_number}
-Тип визы: {result.visa_type}
-Номер паспорта: {result.passport_number}
-Дата оплаты: {result.payment_date}
-День рождения: {result.birth_date}
-Статус: {result.status}
-Аккаунт: {result.account}
+            Батч номер: {result.batch_no}
+            Рег. номер: {result.register_number}
+            Полное имя: {result.full_name}
+            Номер визы: {result.visitor_visa_number}
+            Тип визы: {result.visa_type}
+            Номер паспорта: {result.passport_number}
+            Дата оплаты: {result.payment_date}
+            День рождения: {result.birth_date}
+            Статус: {result.status}
+            Аккаунт: {result.account}
         """.strip()
         
         file_path = f"src/temp/{result.register_number}_batch_application.pdf"
@@ -206,8 +206,8 @@ async def start_search_stay(callback: CallbackQuery, state: FSMContext):
 
     await state.set_state(StayPermitSearch.waiting_for_stay_permit)
     await callback.message.answer(
-        "Введите имя и фамилию на латинице и номер паспорта\n"
-        "Пример: ROMAN DUDUKALOV 4729312290"
+        "Введите номер паспорта\n"
+        "Пример: 4729312290"
     )
     await callback.answer()
 
