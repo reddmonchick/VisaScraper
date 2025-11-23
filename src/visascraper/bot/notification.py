@@ -3,10 +3,18 @@ from datetime import date, timedelta
 import os
 from database.db import SessionLocal
 from database.models import BatchApplication, StayPermit
+from utils.logger import logger as custom_logger
 from sqlalchemy import func
 from aiogram.exceptions import TelegramRetryAfter
+from dotenv import load_dotenv
 import asyncio
 from aiogram.types import FSInputFile
+import queue
+import asyncio
+from aiogram.types import FSInputFile
+import os
+
+load_dotenv()
 
 
 # === Инициализация бота ===
@@ -17,6 +25,9 @@ bot = Bot(token=BOT_TOKEN)
 
 # === Асинхронная отправка сообщения ===
 DELAY_BETWEEN_MESSAGES = 1  # 1 секунда между сообщениями
+
+# Глобальная очередь — безопасная для многопоточной записи
+notification_queue = queue.Queue()   # ←←← ВОТ ЭТА СТРОКА ИЗМЕНИЛАСЬ
 
 async def send_telegram_message(text: str, document: FSInputFile = None):
     bot = Bot(token=os.getenv("TELEGRAM_BOT_TOKEN"))
@@ -36,9 +47,65 @@ async def send_telegram_message(text: str, document: FSInputFile = None):
         await asyncio.sleep(e.retry_after)
         await send_telegram_message(text)  # Повторяем отправку после ожидания
     except Exception as e:
-        print(f"❌ Ошибка при отправке сообщения: {e}")
+        print(f"❌ Ошибка при отправке сообщения: {e} {os.getenv("TELEGRAM_CHANNEL_ID")}")
     finally:
         await bot.session.close()
+
+# Обработчик очереди — запускается в основном event loop
+async def notification_worker():
+    custom_logger.info("notification_worker запущен и ждёт задачи...")
+    while True:
+        try:
+            # ←←← .get() блокирует, пока не придёт задача
+            item = notification_queue.get(timeout=1)
+        except queue.Empty:
+            continue
+
+        if item["type"] == "new_stay_permit":
+            data = item["data"]
+            reg_number = data.get("reg_number")
+            if not reg_number:
+                notification_queue.task_done()
+                continue
+
+            # Проверка, не отправляли ли уже
+            db = SessionLocal()
+            try:
+                permit = db.query(StayPermit).filter(StayPermit.reg_number == reg_number).first()
+                if permit and getattr(permit, "notified_as_new", False):
+                    notification_queue.task_done()
+                    continue
+            finally:
+                db.close()
+
+            file_path = f"src/temp/{reg_number}_stay_permit.pdf"
+            document = FSInputFile(file_path) if os.path.exists(file_path) else None
+
+            text = (
+                    "🗒️Новый ITK в системе!\n\n"
+                    f"ФИО: {data.get('name') or '—'}\n"
+                    f"Паспорт: {data.get('passport_number') or '—'}\n"
+                    f"Тип: {data.get('type_of_staypermit') or '—'}\n"
+                    f"Выдан: {data.get('issue_date') or '—'}\n"
+                    f"До: {data.get('expired_date') or '—'}\n"
+                    f"Рег.номер: {reg_number}"
+                )
+
+            await send_telegram_message(text, document=document)
+
+            # Помечаем как отправленное
+            db = SessionLocal()
+            try:
+                permit = db.query(StayPermit).filter(StayPermit.reg_number == reg_number).first()
+                if permit:
+                    permit.notified_as_new = True
+                    db.commit()
+            except:
+                db.rollback()
+            finally:
+                db.close()
+
+        notification_queue.task_done()
 
 
 # === 1. Уведомление о статусе "Approved" ===

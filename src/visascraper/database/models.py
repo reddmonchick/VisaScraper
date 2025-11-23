@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, Text
+from sqlalchemy import Column, Integer, String, Date, Text, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -28,10 +28,10 @@ class BatchApplication(Base):
     last_status = Column(String, default=None)
 
 class StayPermit(Base):
-    __tablename__ = 'stay_permits'
+    __tablename__ = "stay_permits"
 
     id = Column(Integer, primary_key=True)
-    reg_number = Column(String)
+    reg_number = Column(String, unique=True, nullable=False, index=True)
     name = Column(String)
     type_of_staypermit = Column(String)
     visa_type = Column(String)
@@ -40,6 +40,8 @@ class StayPermit(Base):
     issue_date = Column(String)
     expired_date = Column(String)
     status = Column(String)
+    last_status = Column(String)
     action_link = Column(String)
     account = Column(String)
-    last_status = Column(String, default=None)
+
+    notified_as_new = Column(Boolean, default=False, nullable=False)

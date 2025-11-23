@@ -1,9 +1,4 @@
 
-"""
-Основной скрипт для парсинга данных с evisa.imigrasi.go.id,
-сохранения их в БД и записи в Google Sheets.
-Также включает логику уведомлений через Telegram бота.
-"""
 import os
 import sys
 import json
@@ -11,70 +6,76 @@ import time
 import signal
 import threading
 import asyncio
-import logging as py_logging
 from traceback import format_exc
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
 from typing import List, Tuple, Dict, Any, Optional, NamedTuple
 from dataclasses import dataclass, asdict
-
-
 import gspread
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.executors.pool import ThreadPoolExecutor
 from curl_cffi import requests
+import asyncio
 from bs4 import BeautifulSoup
-import yadisk 
+import yadisk
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
-
 from database.db import init_db, SessionLocal
-from database.models import BatchApplication, StayPermit
-from database.crud import save_or_update_batch_data, save_or_update_stay_permit_data
-from session_manager import login, check_session, load_session 
-from utils.driver_uploader import upload_to_yandex_disk, download_pdf 
-from utils.logger import logger as custom_logger # Используем логгер
+from database.crud import save_or_update_batch_data, save_or_update_stay_permit_data, save_or_update_stay_permit_data_async
+from session_manager import login, check_session, load_session
+from utils.logger import logger as custom_logger
 from utils.parser import (
     safe_get, extract_status_batch, extract_status,
-    extract_action_link as extract_action_link_parser, # Переименовано во избежание конфликта
+    extract_action_link as extract_action_link_parser,
     extract_reg_number, extract_visa, extract_detail
 )
+from utils.sheets_rotator import ensure_valid_spreadsheet
 from bot.handler import bot_router
 from utils.scheduler import start_scheduler as start_notification_scheduler
-
-
+from bot.notification import notification_queue, notification_worker
 from dotenv import load_dotenv
+
+import gspread
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+import os
+
+SCOPES = [
+    'https://www.googleapis.com/auth/spreadsheets',
+    'https://www.googleapis.com/auth/drive'
+]
+
 load_dotenv()
 
-
+# === Конфиги ===
 MAX_ERRORS_BEFORE_RESTART = 5
-RESTART_DELAY_AFTER_ERRORS = 60 # секунд
-RETRY_DELAY_AFTER_ERROR = 30 # секунд
+RESTART_DELAY_AFTER_ERRORS = 60
+RETRY_DELAY_AFTER_ERROR = 30
 BATCH_PARSE_INTERVAL_MINUTES = 10
-STAY_PARSE_HOUR = 7
-STAY_PARSE_MINUTE = 0
-GS_BATCH_SHEET_ID = os.getenv("GOOGLE_SHEET_BATCH_ID")
+
+# Пути и токены
 GS_CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_JSON_PATH")
 YANDEX_TOKEN = os.getenv('YANDEX_TOKEN')
 PROXY = os.getenv('PROXY')
 
+# Вечные таблицы
+GOOGLE_ACCOUNTS_SHEET_ID = os.getenv("GOOGLE_ACCOUNTS_SHEET_ID")  # ← аккаунты
+GOOGLE_ARCHIVE_INDEX_ID = os.getenv("GOOGLE_ARCHIVE_INDEX_ID")   # ← оглавление
 
-IDX_BA_ACCOUNT = 10 # Индекс столбца 'account' в client_data_table (Batch)
-IDX_MGR_ACCOUNT = 5  # Индекс столбца 'account' в manager_data (Batch Manager)
-IDX_MGR_PAYMENT_DATE = 2 # Индекс столбца 'payment_date' в manager_data
-IDX_SP_ACCOUNT = 9   # Индекс столбца 'account' в stay_data (Stay Permit)
-IDX_SP_ACTION_LINK = 7 # Индекс столбца 'action_link' в stay_data
+# Индексы в таблицах
+IDX_BA_ACCOUNT = 10
+IDX_MGR_ACCOUNT = 5
+IDX_MGR_PAYMENT_DATE = 2
+IDX_SP_ACCOUNT = 9
 
-PAYMENT_DATE_FORMAT = "%d-%m-%Y" # Формат даты в строке, например, '28-03-2025'
+PAYMENT_DATE_FORMAT = "%d-%m-%Y"
 SP_TEMP_DIR = "src/temp"
-os.makedirs(SP_TEMP_DIR, exist_ok=True) 
-
+os.makedirs(SP_TEMP_DIR, exist_ok=True)
 
 scheduler_jobs: Optional[BackgroundScheduler] = None
 error_counter = 0
-
-
 
 @dataclass
 class BatchApplicationData:
@@ -394,7 +395,7 @@ class DataParser:
                         break
 
                     items_in_batch = 0
-                    for item_data in result_data:
+                    for item_data in result_data[:1]:
                         try:
                             batch_no = safe_get(item_data, 'header_code').strip().replace('\n', '')
                             reg_number = safe_get(item_data, 'register_number')
@@ -536,7 +537,7 @@ class DataParser:
                         break
 
                     items_in_batch = 0
-                    for item_data in result_data:
+                    for item_data in result_data[:1]:
                         try:
                             reg_number_raw = safe_get(item_data, 'register_number')
                             if not reg_number_raw:
@@ -591,11 +592,23 @@ class DataParser:
                     custom_logger.info(f"Обработан пакет Stay Permit для {name}, offset={offset}, items={items_in_batch}")
                     offset += 1250
 
-                # Сохранение в БД
                 db_dicts = [obj.to_db_dict() for obj in parsed_data_list]
-                with SessionLocal() as db:
-                    save_or_update_stay_permit_data(db, db_dicts)
-                    custom_logger.info(f"✅ Данные Stay Permit для {name} сохранены в БД (всего {len(db_dicts)} записей)")
+
+                if db_dicts:
+                    with SessionLocal() as db:
+                        save_or_update_stay_permit_data(db, db_dicts)
+                    
+                    custom_logger.info(f"Данные Stay Permit для {name} сохранены в БД (всего {len(db_dicts)} записей)")
+
+                    # ←←← А это — уведомления (в очередь)
+                    for item in db_dicts:
+                        notification_queue.put({
+                            "type": "new_stay_permit",
+                            "data": item
+                        })
+                    custom_logger.info(f"Добавлено {len(db_dicts)} ITK в очередь уведомлений (аккаунт {name})")
+                else:
+                    custom_logger.info(f"Нет данных StayPermit для аккаунта {name}")
 
                 # Подготовка данных для Google Sheets
                 sheet_data = [obj.to_sheet_row() for obj in parsed_data_list]
@@ -646,39 +659,51 @@ class DataParser:
 
         return batch_app_table, batch_mgr_table, stay_data_table
 
+
+
 class GoogleSheetsManager:
-    """Логика работы с Google Sheets."""
-    def __init__(self, credentials_path: str):
-        self.credentials_path = credentials_path
+    def __init__(self):
         self.gc = None
+        self.token_path = "token.json"                    # ← будет создан автоматически
+        self.creds_path = "src/credentials_oauth.json"     # ← твой скачанный файл
         self._init_client()
 
     def _init_client(self):
-        """Инициализирует клиент gspread."""
-        try:
-            if not os.path.exists(self.credentials_path):
-                 custom_logger.critical(f"Файл учетных данных Google Sheets не найден: {self.credentials_path}")
-                 raise FileNotFoundError(f"Файл учетных данных Google Sheets не найден: {self.credentials_path}")
-                 
-            credentials = json.load(open(self.credentials_path))
-            self.gc = gspread.service_account_from_dict(credentials)
-        except Exception as e:
-            custom_logger.critical(f"Не удалось инициализировать клиент Google Sheets: {e}")
-            raise
+        creds = None
+
+        # Пробуем загрузить существующий токен
+        if os.path.exists(self.token_path):
+            creds = Credentials.from_authorized_user_file(self.token_path, SCOPES)
+
+        # Если токена нет или он просрочен — запускаем авторизацию
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                custom_logger.info("Запускаем авторизацию Google (откроется браузер)...")
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    self.creds_path, SCOPES
+                )
+                creds = flow.run_local_server(port=0)  # ← откроет браузер на ПК
+
+            # Сохраняем токен для будущего использования
+            with open(self.token_path, "w") as token_file:
+                token_file.write(creds.to_json())
+            custom_logger.info(f"Токен успешно сохранён в {self.token_path}")
+
+        self.gc = gspread.authorize(creds)
+        custom_logger.info("Google Sheets подключен через твой личный аккаунт — лимиты бесконечные!")
 
     def _parse_date_for_sorting(self, date_str: str) -> date:
-        """Преобразует строку даты 'DD-MM-YYYY' в datetime.date для сортировки."""
         if not date_str:
-            return date.min 
+            return date.min
         try:
             return datetime.strptime(date_str, PAYMENT_DATE_FORMAT).date()
         except ValueError:
-            custom_logger.warning(f"Не удалось преобразовать дату '{date_str}' для сортировки.")
             return date.min
 
-    def write_to_sheet(self, spreadsheet_key: str, batch_app_data: List[List[str]], manager_data: List[List[str]], stay_data: List[List[str]]):
+    def write_to_sheet(self, batch_app_data: List[List[str]], manager_data: List[List[str]], stay_data: List[List[str]]):
         max_retries = 3
-        base_delay = 5
         chunk_size = 500
 
         for attempt in range(1, max_retries + 1):
@@ -686,308 +711,163 @@ class GoogleSheetsManager:
                 if not self.gc:
                     self._init_client()
 
+                # ← ВОЛШЕБНАЯ СТРОКА — всегда актуальная таблица
+                spreadsheet_key = ensure_valid_spreadsheet(self.gc)
+                custom_logger.info(f"Запись данных → таблица: {spreadsheet_key}")
                 spreadsheet = self.gc.open_by_key(spreadsheet_key)
-                
+
                 accounts_to_process = list(set(row[IDX_BA_ACCOUNT] for row in batch_app_data)) if batch_app_data else []
-                custom_logger.info(f"Обновляем данные для аккаунтов: {accounts_to_process}")
+                custom_logger.info(f"Обновляем аккаунты: {accounts_to_process}")
 
-                # --- Batch Application ---
-                header_batch = ['Batch No', 'Register Number', 'Full Name', 'Date of Birth', 'Visitor Visa Number', 'Passport Number', 'Payment Date', 'Visa Type', 'Status', 'Action Link', 'Account']  # Фиксированный заголовок
-                num_columns_batch = len(header_batch)
+                # === Batch Application ===
+                header_batch = ['Batch No', 'Register Number', 'Full Name', 'Date of Birth', 'Visitor Visa Number',
+                                'Passport Number', 'Payment Date', 'Visa Type', 'Status', 'Action Link', 'Account']
+                ws_batch = spreadsheet.worksheet('Batch Application')
+                all_batch = ws_batch.get_all_values()
+                existing = [r for r in all_batch[1:] if r and len(r) >= 11 and r[IDX_BA_ACCOUNT] not in accounts_to_process]
+                new_sorted = sorted(batch_app_data, key=lambda x: self._parse_date_for_sorting(x[6]), reverse=True)
+                ws_batch.clear()
+                self._append_rows_in_chunks(ws_batch, [header_batch] + existing + new_sorted, chunk_size)
 
-                worksheet_batch = spreadsheet.worksheet('Batch Application')
-                all_batch_data = worksheet_batch.get_all_values()
-                existing_batch_data = all_batch_data[1:] if len(all_batch_data) > 1 else []  # Игнорируем старый заголовок
-
-                # Нормализуем старые строки: удаляем ведущие '', обрезаем/паддим до num_columns_batch
-                normalized_existing = []
-                for row in existing_batch_data:
-                    # Удаляем ведущие ''
-                    while row and row[0] == '':
-                        row.pop(0)
-                    # Обрезаем если длиннее, паддим '' если короче
-                    if len(row) > num_columns_batch:
-                        row = row[:num_columns_batch]
-                    elif len(row) < num_columns_batch:
-                        row += [''] * (num_columns_batch - len(row))
-                    normalized_existing.append(row)
-
-                # Фильтруем (теперь len(row) == num_columns_batch, но для safety)
-                filtered_batch_data = [
-                    row for row in normalized_existing if len(row) == num_columns_batch and row[IDX_BA_ACCOUNT] not in accounts_to_process
-                ]
-                
-                sorted_new_batch_data = sorted(batch_app_data, key=lambda row: self._parse_date_for_sorting(row[6]), reverse=True)
-                
-                updated_batch_data = filtered_batch_data + sorted_new_batch_data
-                
-                worksheet_batch.clear()
-                self._append_rows_in_chunks(worksheet_batch, [header_batch] + updated_batch_data, chunk_size)
-                custom_logger.info("✅ Данные Batch Application обновлены в Google Sheets")
-
-                # --- Batch Application(Manager) --- (аналогично, фиксированный заголовок)
+                # === Manager ===
                 header_mgr = ['Full Name', 'Visa Type', 'Payment Date', 'Status', 'Action Link', 'Account']
-                num_columns_mgr = len(header_mgr)
+                ws_mgr = spreadsheet.worksheet('Batch Application(Manager)')
+                all_mgr = ws_mgr.get_all_values()
+                existing_mgr = [r for r in all_mgr[1:] if r and len(r) >= 6 and r[IDX_MGR_ACCOUNT] not in accounts_to_process]
+                new_mgr_sorted = sorted(manager_data, key=lambda x: self._parse_date_for_sorting(x[IDX_MGR_PAYMENT_DATE]), reverse=True)
+                ws_mgr.clear()
+                self._append_rows_in_chunks(ws_mgr, [header_mgr] + existing_mgr + new_mgr_sorted, chunk_size)
 
-                worksheet_manager = spreadsheet.worksheet('Batch Application(Manager)')
-                all_mgr_data = worksheet_manager.get_all_values()
-                existing_mgr_data = all_mgr_data[1:] if len(all_mgr_data) > 1 else []
+                # === Stay Permit ===
+                header_stay = ['Name', 'Type of Stay Permit', 'Visa Type', 'Arrival Date', 'Issue Date',
+                               'Expired Date', 'Status', 'Action Link', 'Passport Number', 'Account']
+                ws_stay = spreadsheet.worksheet('StayPermit')
+                all_stay = ws_stay.get_all_values()
+                existing_stay = [r for r in all_stay[1:] if r and len(r) >= 10 and r[IDX_SP_ACCOUNT] not in accounts_to_process]
+                ws_stay.clear()
+                self._append_rows_in_chunks(ws_stay, [header_stay] + existing_stay + stay_data, chunk_size)
 
-                normalized_mgr = []  # Аналогичная нормализация
-                for row in existing_mgr_data:
-                    while row and row[0] == '':
-                        row.pop(0)
-                    if len(row) > num_columns_mgr:
-                        row = row[:num_columns_mgr]
-                    elif len(row) < num_columns_mgr:
-                        row += [''] * (num_columns_mgr - len(row))
-                    normalized_mgr.append(row)
-
-                filtered_mgr_data = [
-                    row for row in normalized_mgr if len(row) == num_columns_mgr and row[IDX_MGR_ACCOUNT] not in accounts_to_process
-                ]
-                
-                sorted_new_mgr_data = sorted(manager_data, key=lambda row: self._parse_date_for_sorting(row[IDX_MGR_PAYMENT_DATE]), reverse=True)
-                
-                updated_mgr_data = filtered_mgr_data + sorted_new_mgr_data
-                
-                worksheet_manager.clear()
-                self._append_rows_in_chunks(worksheet_manager, [header_mgr] + updated_mgr_data, chunk_size)
-                custom_logger.info("✅ Данные Batch Application(Manager) обновлены в Google Sheets")
-
-                # --- Stay Permit --- (аналогично)
-                header_stay = ['Name', 'Type of Stay Permit', 'Visa Type', 'Arrival Date', 'Issue Date', 'Expired Date', 'Status', 'Action Link', 'Passport Number', 'Account']
-                num_columns_stay = len(header_stay)
-
-                worksheet_stay = spreadsheet.worksheet('StayPermit')
-                all_stay_data = worksheet_stay.get_all_values()
-                existing_stay_data = all_stay_data[1:] if len(all_stay_data) > 1 else []
-
-                normalized_stay = []
-                for row in existing_stay_data:
-                    while row and row[0] == '':
-                        row.pop(0)
-                    if len(row) > num_columns_stay:
-                        row = row[:num_columns_stay]
-                    elif len(row) < num_columns_stay:
-                        row += [''] * (num_columns_stay - len(row))
-                    normalized_stay.append(row)
-
-                filtered_stay_data = [
-                    row for row in normalized_stay if len(row) == num_columns_stay and row[IDX_SP_ACCOUNT] not in accounts_to_process
-                ]
-
-                updated_stay_data = filtered_stay_data + stay_data
-                
-                worksheet_stay.clear()
-                self._append_rows_in_chunks(worksheet_stay, [header_stay] + updated_stay_data, chunk_size)
-                custom_logger.info("✅ Данные Stay Permit обновлены в Google Sheets")
-                
-                return 
+                custom_logger.info("ВСЕ ДАННЫЕ УСПЕШНО ЗАПИСАНЫ В GOOGLE SHEETS")
+                return
 
             except Exception as e:
-                custom_logger.warning(f"⚠️ Попытка {attempt}/{max_retries} записи в Google Sheets не удалась: {e}\n{format_exc()}")
-                if attempt < max_retries:
-                    delay = base_delay * (2 ** (attempt - 1))
-                    custom_logger.info(f"Повтор через {delay} секунд...")
-                    time.sleep(delay)
-                else:
-                    custom_logger.error(f"❌ Все {max_retries} попытки записи в Google Sheets не удались.")
+                custom_logger.error(f"Попытка {attempt}/3 записи в Sheets: {e}\n{format_exc()}")
+                if attempt == max_retries:
+                    custom_logger.critical("Запись в Google Sheets провалилась окончательно!")
                     raise
+                time.sleep(10 * attempt)
 
     def _append_rows_in_chunks(self, worksheet, data, chunk_size: int):
-        """Добавляет данные в лист Google Sheets порциями."""
-        if not data or not any(data):
-            custom_logger.warning(f"Нет данных для записи в лист '{worksheet.title}'.")
+        if not data:
             return
-
-        custom_logger.info(f"Начинаем запись {len(data)} строк в лист '{worksheet.title}'...")
         for i in range(0, len(data), chunk_size):
             chunk = data[i:i + chunk_size]
-            if i > 0: 
-                time.sleep(1) 
-            try:
-                worksheet.append_rows(chunk, value_input_option='USER_ENTERED')
-                custom_logger.debug(f"Записана порция {i//chunk_size + 1} в '{worksheet.title}'")
-            except Exception as e:
-                custom_logger.error(f"❌ Ошибка при записи порции в лист '{worksheet.title}': {e}")
-                raise
-        custom_logger.info(f"✅ Запись данных в лист '{worksheet.title}' завершена.") 
+            worksheet.append_rows(chunk, value_input_option='USER_ENTERED')
+            if i > 0:
+                time.sleep(1)
+
 
 class JobScheduler:
-    """Управление задачами планировщика."""
-    def __init__(self, gs_manager: GoogleSheetsManager, data_parser: DataParser):
+    def __init__(self, gs_manager: GoogleSheetsManager, data_parser):
         self.gs_manager = gs_manager
         self.data_parser = data_parser
         self.scheduler = None
-        # УБРАЛИ ВЕСЬ КЭШ, ОН БЫЛ ИСТОЧНИКОМ ОШИБКИ
-        # self.cached_batch_application_data ... и т.д.
+
+    def _get_accounts_from_permanent_sheet(self) -> tuple[List[str], List[str]]:
+        """Читает аккаунты из ВЕЧНОЙ таблицы GOOGLE_ACCOUNTS_SHEET_ID"""
+        try:
+            sheet = self.gs_manager.gc.open_by_key(GOOGLE_ACCOUNTS_SHEET_ID)
+            ws = sheet.worksheet("Аккаунты")
+            values = ws.get_all_values()
+            if len(values) < 2:
+                custom_logger.warning("В таблице аккаунтов меньше 2 строк!")
+                return [], []
+            names = [row[0] for row in values[1:]]
+            passwords = [row[1] for row in values[1:]]
+            return names, passwords
+        except Exception as e:
+            custom_logger.error(f"Ошибка чтения таблицы аккаунтов: {e}")
+            return [], []
 
     def job_first_two(self):
-        """Задача для парсинга ПЕРВЫХ ДВУХ аккаунтов (для планировщика)."""
-        custom_logger.info("Запуск задачи для первых двух аккаунтов")
+        custom_logger.info("Запуск задачи: первые два аккаунта")
         try:
-            if not self.gs_manager.gc:
-                self.gs_manager._init_client()
-                
-            spreadsheet_batch = self.gs_manager.gc.open_by_key(GS_BATCH_SHEET_ID)
-            worksheet_account = spreadsheet_batch.worksheet('Аккаунты')
-            all_values = worksheet_account.get_all_values()
-            if len(all_values) < 2:
-                custom_logger.warning("Недостаточно аккаунтов для выполнения задачи 'первых двух'")
+            names, passwords = self._get_accounts_from_permanent_sheet()
+            if len(names) < 2:
+                custom_logger.warning("Недостаточно аккаунтов")
                 return
-
-            names = [row[0] for row in all_values[0:2]] # Берем только 2 и 3 строки (индексы 1 и 2)
-            passwords = [row[1] for row in all_values[0:2]]
-
-            # Парсим ТОЛЬКО эти аккаунты
-            batch_app, batch_mgr, stay = self.data_parser.parse_accounts(names, passwords)
-
-            # Записываем в Google Sheets ТОЛЬКО их данные
-            self.gs_manager.write_to_sheet(GS_BATCH_SHEET_ID, batch_app, batch_mgr, stay)
-            custom_logger.info("✅ Задача для первых двух аккаунтов успешно выполнена.")
-
+            batch_app, batch_mgr, stay = self.data_parser.parse_accounts(names[:2], passwords[:2])
+            self.gs_manager.write_to_sheet(batch_app, batch_mgr, stay)
+            custom_logger.info("Задача 'первые два' выполнена")
         except Exception as e:
-            custom_logger.error(f"[job_first_two] Критическая ошибка: {e}\n{format_exc()}")
+            custom_logger.error(f"[job_first_two] Ошибка: {e}\n{format_exc()}")
 
     def job_others(self):
-        """Задача для парсинга ОСТАЛЬНЫХ аккаунтов (для вызова из бота)."""
-        custom_logger.info("Запуск задачи для остальных аккаунтов")
+        custom_logger.info("Запуск задачи: остальные аккаунты")
         try:
-            if not self.gs_manager.gc:
-                self.gs_manager._init_client()
-                
-            spreadsheet_batch = self.gs_manager.gc.open_by_key(GS_BATCH_SHEET_ID)
-            worksheet_account = spreadsheet_batch.worksheet('Аккаунты')
-            all_values = worksheet_account.get_all_values()
-            
-            if len(all_values) <= 3: # Если аккаунтов 2 или меньше (1 заголовок + 2 акка)
-                custom_logger.info("Нет 'остальных' аккаунтов для обработки.")
+            names, passwords = self._get_accounts_from_permanent_sheet()
+            if len(names) <= 2:
+                custom_logger.info("Нет остальных аккаунтов")
                 return
-
-            # Берем все, начиная с 4-й строки (индекс 3)
-            remaining_accounts = all_values[2:]
-            names = [row[0] for row in remaining_accounts]
-            passwords = [row[1] for row in remaining_accounts]
-
-            if not names:
-                custom_logger.info("Не найдено 'остальных' аккаунтов для парсинга.")
-                return
-
-            # Парсим ТОЛЬКО эти аккаунты
-            batch_app, batch_mgr, stay = self.data_parser.parse_accounts(names, passwords)
-
-            # Записываем в Google Sheets ТОЛЬКО их данные
-            self.gs_manager.write_to_sheet(GS_BATCH_SHEET_ID, batch_app, batch_mgr, stay)
-            custom_logger.info("✅ Задача для остальных аккаунтов успешно выполнена.")
-
+            batch_app, batch_mgr, stay = self.data_parser.parse_accounts(names[2:], passwords[2:])
+            self.gs_manager.write_to_sheet(batch_app, batch_mgr, stay)
+            custom_logger.info("Задача 'остальные' выполнена")
         except Exception as e:
-            custom_logger.error(f"[job_others] Критическая ошибка: {e}\n{format_exc()}")
-
+            custom_logger.error(f"[job_others] Ошибка: {e}\n{format_exc()}")
 
     def start_scheduler(self):
-        """Запускает планировщик задач парсинга (только для первых двух)."""
         global scheduler_jobs
-        self.scheduler = BackgroundScheduler(
-            timezone=ZoneInfo("Europe/Moscow"),
-            executors={'default': ThreadPoolExecutor(2)}
-        )
+        self.scheduler = BackgroundScheduler(timezone=ZoneInfo("Europe/Moscow"))
         self.scheduler.add_job(
-            self.job_first_two, # В расписании только эта задача
+            self.job_first_two,
             'interval',
             minutes=BATCH_PARSE_INTERVAL_MINUTES,
             coalesce=True,
-            misfire_grace_time=60 * 5
+            max_instances=1
         )
         self.scheduler.start()
         scheduler_jobs = self.scheduler
-        custom_logger.info("Планировщик парсинга запущен (только для первых двух аккаунтов)")
+        custom_logger.info("Планировщик запущен (только первые два аккаунта)")
 
-class BotRunner:
-    """Запуск и управление Telegram ботом."""
-    def __init__(self, app):
-        self.bot = Bot(token=os.getenv("TELEGRAM_BOT_TOKEN"))
-        # Передаем экземпляр 'app' в Dispatcher, чтобы он был доступен в хендлерах
-        self.dp = Dispatcher(storage=MemoryStorage(), app=app)
-        self.dp.include_router(bot_router)
 
-    async def run(self):
-        """Асинхронный запуск бота."""
-        await start_notification_scheduler() # запуск асинхронного планировщика уведомлений
-        await self.dp.start_polling(self.bot)
-
+# === Основное приложение ===
 class Application:
-    """Основной класс приложения, объединяющий все компоненты."""
     def __init__(self):
         self.session_manager = SessionManager(PROXY)
         self.yandex_uploader = YandexDiskUploader(YANDEX_TOKEN)
         self.pdf_manager = PDFManager(self.session_manager, self.yandex_uploader)
         self.data_parser = DataParser(self.session_manager, self.pdf_manager)
-        self.gs_manager = GoogleSheetsManager(GS_CREDENTIALS_PATH)
-        # Передаем data_parser в JobScheduler
-        self.job_scheduler = JobScheduler(self.gs_manager, self.data_parser) 
-        # Передаем 'self' (экземпляр Application) в BotRunner
+        self.gs_manager = GoogleSheetsManager()
+        self.job_scheduler = JobScheduler(self.gs_manager, self.data_parser)
         self.bot_runner = BotRunner(self)
 
-    def shutdown_handler(self, signum, frame):
-        """Обработчик сигналов завершения."""
-        custom_logger.info("Получен сигнал завершения. Останавливаем планировщики...")
-        if self.job_scheduler.scheduler:
-            self.job_scheduler.scheduler.shutdown()
-        sys.exit(0)
-
-    def setup_signal_handlers(self):
-        """Настраивает обработчики сигналов."""
-        signal.signal(signal.SIGINT, self.shutdown_handler)
-        signal.signal(signal.SIGTERM, self.shutdown_handler)
-
     def run_parsing_cycle(self):
-        """Выполняет один цикл парсинга (для инициализации)."""
         custom_logger.info("Запуск начального парсинга...")
-
         self.job_scheduler.job_first_two()
-        #self.job_scheduler.job_others()
 
     async def run(self):
-        """Асинхронная точка входа для запуска всего приложения."""
         global error_counter
         init_db()
-        
-        self.setup_signal_handlers() 
+        self.run_parsing_cycle()
+        self.job_scheduler.start_scheduler()
 
-        parser_thread = threading.Thread(target=self.main_loop, daemon=True)
-        parser_thread.start()
-        
-
-        await asyncio.sleep(5)
-        
-
+        # Запуск бота
         await self.bot_runner.run()
 
-    def main_loop(self):
-        """Основной цикл запуска приложения."""
-        global error_counter
-        started = False
-        while not started:
-            try:
-                self.run_parsing_cycle()
-                self.job_scheduler.start_scheduler()
-                custom_logger.info("Основной поток работает")
-                started = True
-                error_counter = 0 # Сброс счётчика после успешного запуска
-            except Exception as e:
-                error_counter += 1
-                custom_logger.error(f"Ошибка при запуске (попытка {error_counter}/{MAX_ERRORS_BEFORE_RESTART}): {e}")
-                if self.job_scheduler.scheduler:
-                    self.job_scheduler.scheduler.shutdown()
-                if error_counter >= MAX_ERRORS_BEFORE_RESTART:
-                    custom_logger.critical("Превышено количество попыток. Перезапуск программы через 60 секунд...")
-                    time.sleep(RESTART_DELAY_AFTER_ERRORS)
-                    os.execv(sys.executable, [sys.executable] + sys.argv)
-                else:
-                    custom_logger.warning(f"Перезапуск через {RETRY_DELAY_AFTER_ERROR} секунд...")
-                    time.sleep(RETRY_DELAY_AFTER_ERROR)
 
+class BotRunner:
+    def __init__(self, app):
+        self.bot = Bot(token=os.getenv("TELEGRAM_BOT_TOKEN"))
+        self.dp = Dispatcher(storage=MemoryStorage(), app=app)
+        self.dp.include_router(bot_router)
+
+    async def run(self):
+        await start_notification_scheduler()
+
+        asyncio.create_task(notification_worker())
+
+
+        await self.dp.start_polling(self.bot)
 
 
 if __name__ == "__main__":
