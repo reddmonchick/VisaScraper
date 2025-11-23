@@ -537,7 +537,7 @@ class DataParser:
                         break
 
                     items_in_batch = 0
-                    for item_data in result_data[:1]:
+                    for item_data in result_data:
                         try:
                             reg_number_raw = safe_get(item_data, 'register_number')
                             if not reg_number_raw:
