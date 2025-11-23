@@ -1,11 +1,69 @@
+# База данных
 database.db
+*.db
+
+# Переменные окружения
 .env
-.venv
+.env.local
+*.env
+
+# Виртуальное окружение
+.venv/
+venv/
+env/
+ENV/
+
+# Python кэш
 __pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Bot и данные
+.bot_data/
+.db_data/
 .bot_data
 .db_data
+
+# Google API credentials
 src/drive_account.json
 src/service_account.json
 src/credentials_oauth.json
 src/credentials.json
 src/data.json
+src/token.json
+src/*.json
+
+# IDE
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+
+# Логи
+*.log
+logs/
+
+# Temp файлы
+src/temp/
+temp/
+*.tmp
