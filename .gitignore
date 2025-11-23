@@ -6,3 +6,6 @@ __pycache__/
 .db_data
 src/drive_account.json
 src/service_account.json
+src/credentials_oauth.json
+src/credentials.json
+src/data.json
