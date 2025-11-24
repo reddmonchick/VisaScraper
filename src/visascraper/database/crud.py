@@ -37,35 +37,40 @@ def save_or_update_batch_data(db: Session, data_list: list):
     db.commit()
 
 
-def save_or_update_stay_permit_data(db: Session, data_list: list):
-    """СИНХРОННАЯ версия — используется внутри асинхронной обёртки."""
-    for item_data in data_list:
-        reg_number = item_data.get("reg_number")
+def save_or_update_stay_permit_data(db: Session, data_list: List[dict]):
+    """Сохраняет/обновляет Stay Permit — один коммит в конце"""
+    if not data_list:
+        return
+
+    for data in data_list:
+        reg_number = data.get('reg_number')
         if not reg_number:
             continue
 
-        existing_permit = db.query(StayPermit).filter(StayPermit.reg_number == reg_number).first()
-        if existing_permit:
-            new_status = item_data.get("status")
-            if existing_permit.status != new_status:
-                existing_permit.last_status = existing_permit.status
-                existing_permit.status = new_status
-
-            for key, value in item_data.items():
-                if hasattr(existing_permit, key):
-                    setattr(existing_permit, key, value)
+        existing = db.query(StayPermit).filter_by(reg_number=reg_number).first()
+        if existing:
+            # Обновляем только изменённые поля
+            for key, value in data.items():
+                if hasattr(existing, key):
+                    setattr(existing, key, value)
+            custom_logger.info(f"Обновлена запись Stay Permit: {reg_number}")
         else:
-            new_permit = StayPermit(**item_data)
-            db.add(new_permit)
-    db.commit()
+            # Новая запись
+            new_record = StayPermit(**data)
+            db.add(new_record)
+            custom_logger.info(f"Добавлена новая запись Stay Permit: {reg_number}")
 
+    # ОДИН КОММИТ В КОНЦЕ — ВОТ ЭТО КРАСОТА
+    db.commit()
 
 async def save_or_update_stay_permit_data_async(data_list: List[dict]):
     if not data_list:
         return
 
+    # 1. Сначала сохраняем в БД (в отдельном потоке)
     await asyncio.to_thread(save_or_update_stay_permit_data, SessionLocal(), data_list)
 
+    # 2. Потом отправляем уведомления только о новых (notified_as_new == False)
     db = SessionLocal()
     try:
         for item in data_list:
@@ -74,11 +79,8 @@ async def save_or_update_stay_permit_data_async(data_list: List[dict]):
                 continue
 
             permit = db.query(StayPermit).filter(StayPermit.reg_number == reg_number).first()
-            if not permit:
+            if not permit or getattr(permit, "notified_as_new", False):
                 continue
-
-            if getattr(permit, "notified_as_new", False):
-                continue 
 
             file_path = f"src/temp/{reg_number}_stay_permit.pdf"
             document = FSInputFile(file_path) if os.path.exists(file_path) else None
@@ -94,16 +96,14 @@ async def save_or_update_stay_permit_data_async(data_list: List[dict]):
                 f"Статус: {item.get('status', 'не указан')}"
             )
 
-            # Отправляем асинхронно — попадает в основной бот-loop
+            # Отправляем в фоне — не ждём!
             asyncio.create_task(send_telegram_message(text, document=document))
 
-            # Помечаем как уведомлённый (если есть поле)
-            if hasattr(permit, "notified_as_new"):
-                permit.notified_as_new = True
+            # Помечаем как отправленное
+            permit.notified_as_new = True
 
         db.commit()
         custom_logger.info(f"Уведомления о новых StayPermit отправлены: {len(data_list)} шт.")
-
     except Exception as e:
         custom_logger.error(f"Ошибка при отправке уведомлений о новых ITK: {e}")
         db.rollback()

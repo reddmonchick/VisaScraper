@@ -20,6 +20,7 @@ from bs4 import BeautifulSoup
 import yadisk
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
+from apscheduler.schedulers.background import BackgroundScheduler
 
 from database.db import init_db, SessionLocal
 from database.crud import save_or_update_batch_data, save_or_update_stay_permit_data, save_or_update_stay_permit_data_async
@@ -32,7 +33,7 @@ from utils.parser import (
 )
 from utils.sheets_rotator import ensure_valid_spreadsheet
 from bot.handler import bot_router
-from utils.scheduler import start_scheduler as start_notification_scheduler
+from utils.scheduler import start_scheduler
 from bot.notification import notification_queue, notification_worker
 from dotenv import load_dotenv
 
@@ -327,9 +328,10 @@ class PDFManager:
 
 class DataParser:
     """Логика парсинга данных с сайта."""
-    def __init__(self, session_manager: SessionManager, pdf_manager: PDFManager):
+    def __init__(self, session_manager: SessionManager, pdf_manager: PDFManager, gs_manager):
         self.session_manager = session_manager
         self.pdf_manager = pdf_manager
+        self.gs_manager = gs_manager  
 
     def _parse_date_for_sorting(self, date_str: str) -> date:
         """Преобразует строку даты в datetime.date для сортировки."""
@@ -395,7 +397,7 @@ class DataParser:
                         break
 
                     items_in_batch = 0
-                    for item_data in result_data[:1]:
+                    for item_data in result_data:
                         try:
                             batch_no = safe_get(item_data, 'header_code').strip().replace('\n', '')
                             reg_number = safe_get(item_data, 'register_number')
@@ -537,7 +539,7 @@ class DataParser:
                         break
 
                     items_in_batch = 0
-                    for item_data in result_data[:1]:
+                    for item_data in result_data:
                         try:
                             reg_number_raw = safe_get(item_data, 'register_number')
                             if not reg_number_raw:
@@ -593,22 +595,13 @@ class DataParser:
                     offset += 1250
 
                 db_dicts = [obj.to_db_dict() for obj in parsed_data_list]
-
                 if db_dicts:
                     with SessionLocal() as db:
                         save_or_update_stay_permit_data(db, db_dicts)
-                    
-                    custom_logger.info(f"Данные Stay Permit для {name} сохранены в БД (всего {len(db_dicts)} записей)")
 
-                    # ←←← А это — уведомления (в очередь)
-                    for item in db_dicts:
-                        notification_queue.put({
-                            "type": "new_stay_permit",
-                            "data": item
-                        })
-                    custom_logger.info(f"Добавлено {len(db_dicts)} ITK в очередь уведомлений (аккаунт {name})")
-                else:
-                    custom_logger.info(f"Нет данных StayPermit для аккаунта {name}")
+                    # ← ЭТО НОВОЕ — МГНОВЕННЫЕ УВЕДОМЛЕНИЯ, НЕ БЛОКИРУЯ ПАРСЕР
+                    loop = asyncio.get_event_loop()
+                    loop.create_task(save_or_update_stay_permit_data_async(db_dicts))
 
                 # Подготовка данных для Google Sheets
                 sheet_data = [obj.to_sheet_row() for obj in parsed_data_list]
@@ -658,7 +651,6 @@ class DataParser:
             custom_logger.info(f'Обработан аккаунт {name} ({temp_counter}/{len(account_names)})')
 
         return batch_app_table, batch_mgr_table, stay_data_table
-
 
 
 class GoogleSheetsManager:
@@ -768,13 +760,12 @@ class GoogleSheetsManager:
 
 
 class JobScheduler:
-    def __init__(self, gs_manager: GoogleSheetsManager, data_parser):
+    def __init__(self, gs_manager: GoogleSheetsManager, data_parser: DataParser):
         self.gs_manager = gs_manager
         self.data_parser = data_parser
-        self.scheduler = None
+        self.scheduler = BackgroundScheduler()
 
     def _get_accounts_from_permanent_sheet(self) -> tuple[List[str], List[str]]:
-        """Читает аккаунты из ВЕЧНОЙ таблицы GOOGLE_ACCOUNTS_SHEET_ID"""
         try:
             sheet = self.gs_manager.gc.open_by_key(GOOGLE_ACCOUNTS_SHEET_ID)
             ws = sheet.worksheet("Аккаунты")
@@ -802,42 +793,30 @@ class JobScheduler:
         except Exception as e:
             custom_logger.error(f"[job_first_two] Ошибка: {e}\n{format_exc()}")
 
-    def job_others(self):
-        custom_logger.info("Запуск задачи: остальные аккаунты")
-        try:
-            names, passwords = self._get_accounts_from_permanent_sheet()
-            if len(names) <= 2:
-                custom_logger.info("Нет остальных аккаунтов")
-                return
-            batch_app, batch_mgr, stay = self.data_parser.parse_accounts(names[2:], passwords[2:])
-            self.gs_manager.write_to_sheet(batch_app, batch_mgr, stay)
-            custom_logger.info("Задача 'остальные' выполнена")
-        except Exception as e:
-            custom_logger.error(f"[job_others] Ошибка: {e}\n{format_exc()}")
-
     def start_scheduler(self):
-        global scheduler_jobs
-        self.scheduler = BackgroundScheduler(timezone=ZoneInfo("Europe/Moscow"))
+        """Запускаем ТОЛЬКО первые два аккаунта по расписанию"""
         self.scheduler.add_job(
             self.job_first_two,
             'interval',
             minutes=BATCH_PARSE_INTERVAL_MINUTES,
-            coalesce=True,
-            max_instances=1
+            next_run_time=datetime.now(),  # сразу при старте
+            id='first_two_accounts',
+            replace_existing=True,
+            misfire_grace_time=300
         )
         self.scheduler.start()
-        scheduler_jobs = self.scheduler
-        custom_logger.info("Планировщик запущен (только первые два аккаунта)")
+        custom_logger.info(f"Автозапуск первых двух аккаунтов каждые {BATCH_PARSE_INTERVAL_MINUTES} мин — ВКЛЮЧЁН")
 
 
 # === Основное приложение ===
+
 class Application:
     def __init__(self):
         self.session_manager = SessionManager(PROXY)
         self.yandex_uploader = YandexDiskUploader(YANDEX_TOKEN)
         self.pdf_manager = PDFManager(self.session_manager, self.yandex_uploader)
-        self.data_parser = DataParser(self.session_manager, self.pdf_manager)
         self.gs_manager = GoogleSheetsManager()
+        self.data_parser = DataParser(self.session_manager, self.pdf_manager, self.gs_manager)
         self.job_scheduler = JobScheduler(self.gs_manager, self.data_parser)
         self.bot_runner = BotRunner(self)
 
@@ -846,13 +825,15 @@ class Application:
         self.job_scheduler.job_first_two()
 
     async def run(self):
-        global error_counter
         init_db()
-        self.run_parsing_cycle()
+        
+        # 1. Автозапуск первых двух аккаунтов — каждые 10 минут
         self.job_scheduler.start_scheduler()
+        custom_logger.info("Автозапуск первых двух аккаунтов — ВКЛЮЧЁН")
 
-        # Запуск бота
-        await self.bot_runner.run()
+        # 2. Запуск бота — прямо в основном event loop (как и должно быть!)
+        custom_logger.info("Запускаем Telegram бота...")
+        await self.bot_runner.run()  # ← вот и всё, никаких потоков!
 
 
 class BotRunner:
@@ -862,13 +843,11 @@ class BotRunner:
         self.dp.include_router(bot_router)
 
     async def run(self):
-        await start_notification_scheduler()
-
-        asyncio.create_task(notification_worker())
-
-
+        asyncio.create_task(start_scheduler())       
+        #asyncio.create_task(notification_worker())  
+        
+        custom_logger.info("Бот онлайн — готов принимать команды")
         await self.dp.start_polling(self.bot)
-
 
 if __name__ == "__main__":
     app = Application()

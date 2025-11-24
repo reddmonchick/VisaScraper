@@ -14,15 +14,17 @@ def run_async(func):
 
 async def start_scheduler():
     scheduler = AsyncIOScheduler(timezone=ZoneInfo("Europe/Moscow"))
-
-    scheduler.add_job(notify_approved_users, 'interval', minutes=1, coalesce=True, misfire_grace_time=60 * 5)
-    scheduler.add_job(notify_approved_stay_permits, 'interval', minutes=1, coalesce=True, misfire_grace_time=60 * 5)
-    #scheduler.add_job(run_async(check_birthdays), 'cron', hour=4, minute=0)
-    #scheduler.add_job(run_async(check_visa_expirations), 'cron', hour=10, minute=0)
-
-    scheduler.add_job(check_birthdays, 'cron', hour=5, minute=0, coalesce=True, misfire_grace_time=60 * 5)
-    scheduler.add_job(check_visa_expirations, 'cron',hour=5, minute=0, coalesce=True, misfire_grace_time=60 * 5)
-
-
+    
+    # Все функции должны быть async — или обёрнуты в asyncio.to_thread
+    scheduler.add_job(notify_approved_users, 'interval', minutes=1, coalesce=True)
+    scheduler.add_job(notify_approved_stay_permits, 'interval', minutes=1, coalesce=True)
+    
+    # Если check_birthdays и check_visa_expirations — async:
+    scheduler.add_job(check_birthdays, 'cron', hour=5, minute=0)
+    scheduler.add_job(check_visa_expirations, 'cron', hour=5, minute=0)
+    
+    # Если они sync — оборачиваем так:
+    # scheduler.add_job(lambda: asyncio.to_thread(check_birthdays), 'cron', hour=5, minute=0)
+    
     scheduler.start()
-    print("APScheduler запущен...")
+    print("APScheduler (AsyncIO) запущен...")

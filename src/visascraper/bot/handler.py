@@ -67,7 +67,6 @@ def is_authorized(db: Session, telegram_id: str) -> bool:
     user = get_user_by_telegram_id(db, telegram_id)
     return user is not None and user.password == BOT_PASSWORD
 
-
 # Обработчики команд
 @bot_router.message(F.text == "/start")
 async def cmd_start(message: Message, state: FSMContext):
