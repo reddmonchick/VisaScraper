@@ -51,8 +51,11 @@ src/credentials.json
 src/data.json
 src/token.json
 src/*.json
+<<<<<<< HEAD
 token.json
 .token.json
+=======
+>>>>>>> 52512e947d09b7c8f6caf2c09516c28628bff0df
 
 # IDE
 .vscode/
