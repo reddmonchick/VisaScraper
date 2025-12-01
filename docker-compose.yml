@@ -1,0 +1,14 @@
+services:
+  visascraper:
+    build: .                  # ← только это
+    container_name: visa-parser
+    restart: unless-stopped
+    volumes:
+      - parser-data:/app/data
+      - ./token.json:/app/token.json
+      - ./src/credentials_oauth.json:/app/src/credentials_oauth.json
+    env_file:
+      - .env
+
+volumes:
+  parser-data:

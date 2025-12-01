@@ -662,29 +662,34 @@ class GoogleSheetsManager:
 
     def _init_client(self):
         creds = None
-
-        # Пробуем загрузить существующий токен
         if os.path.exists(self.token_path):
             creds = Credentials.from_authorized_user_file(self.token_path, SCOPES)
 
-        # Если токена нет или он просрочен — запускаем авторизацию
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                custom_logger.info("Запускаем авторизацию Google (откроется браузер)...")
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    self.creds_path, SCOPES
-                )
-                creds = flow.run_local_server(port=0)  # ← откроет браузер на ПК
+                try:
+                    creds.refresh(Request())
+                    custom_logger.info("Токен успешно обновлён через refresh_token")
+                except Exception as e:
+                    custom_logger.warning(f"Не удалось обновить токен: {e}. Переавторизация...")
+                    creds = None
 
-            # Сохраняем токен для будущего использования
-            with open(self.token_path, "w") as token_file:
-                token_file.write(creds.to_json())
-            custom_logger.info(f"Токен успешно сохранён в {self.token_path}")
+            if not creds or not creds.valid:
+                custom_logger.info("Токен протух или отсутствует — запускаем переавторизацию...")
+                if os.path.exists(self.token_path):
+                    os.remove(self.token_path)
+
+                flow = InstalledAppFlow.from_client_secrets_file(self.creds_path, SCOPES)
+                
+                # ← ЭТО ВОЛШЕБСТВО: работает и с GUI, и без GUI!
+                creds = flow.run_local_server(port=0) if hasattr(sys, 'frozen') or os.name == 'nt' else flow.run_console()
+                
+                with open(self.token_path, "w") as f:
+                    f.write(creds.to_json())
+                custom_logger.info("Новый токен успешно сохранён!")
 
         self.gc = gspread.authorize(creds)
-        custom_logger.info("Google Sheets подключен через твой личный аккаунт — лимиты бесконечные!")
+        custom_logger.info("Google Sheets подключен — лимиты бесконечные!")
 
     def _parse_date_for_sorting(self, date_str: str) -> date:
         if not date_str:
