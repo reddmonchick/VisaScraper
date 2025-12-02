@@ -1,6 +1,7 @@
 
 from database.db import init_db, SessionLocal
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import or_
 from utils.logger import logger as custom_logger
 from .models import User, BatchApplication, StayPermit
@@ -38,77 +39,119 @@ def save_or_update_batch_data(db: Session, data_list: list):
 
 
 def save_or_update_stay_permit_data(db: Session, data_list: List[dict]):
-    """Сохраняет/обновляет Stay Permit — один коммит в конце"""
+    """
+    Исправленный upsert:
+    1. Убирает дубликаты из входящего списка.
+    2. Загружает существующие записи пачкой (оптимизация).
+    3. Обновляет или вставляет без конфликтов.
+    """
     if not data_list:
         return
 
-    for data in data_list:
-        reg_number = data.get('reg_number')
-        if not reg_number:
-            continue
+    # 1. Убираем дубликаты внутри самого списка data_list.
+    # Используем словарь: если reg_number повторяется, останется последний (самый свежий).
+    unique_data_map = {
+        item['reg_number']: item 
+        for item in data_list 
+        if item.get('reg_number')
+    }
 
-        existing = db.query(StayPermit).filter_by(reg_number=reg_number).first()
+    if not unique_data_map:
+        return
+
+    # 2. Получаем список всех reg_number, которые мы хотим обработать
+    reg_numbers = list(unique_data_map.keys())
+
+    # 3. ОПТИМИЗАЦИЯ: Загружаем все существующие записи одним запросом
+    # вместо того, чтобы делать запрос в цикле для каждой записи.
+    existing_records = db.query(StayPermit).filter(StayPermit.reg_number.in_(reg_numbers)).all()
+    
+    # Создаем словарь существующих записей для быстрого поиска {reg_number: объект}
+    existing_dict = {rec.reg_number: rec for rec in existing_records}
+
+    for reg_number, data in unique_data_map.items():
+        existing = existing_dict.get(reg_number)
+
         if existing:
-            # Обновляем только изменённые поля
+            # Обновляем существующую запись
             for key, value in data.items():
                 if hasattr(existing, key):
                     setattr(existing, key, value)
             custom_logger.info(f"Обновлена запись Stay Permit: {reg_number}")
         else:
-            # Новая запись
+            # Создаем новую запись
             new_record = StayPermit(**data)
             db.add(new_record)
             custom_logger.info(f"Добавлена новая запись Stay Permit: {reg_number}")
 
-    # ОДИН КОММИТ В КОНЦЕ — ВОТ ЭТО КРАСОТА
-    db.commit()
+    # 4. Коммит с обработкой ошибок
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        custom_logger.error(f"Ошибка при сохранении Stay Permits: {e}")
+        # Можно повторно выбросить ошибку, если нужно прервать выполнение
+        # raise e
 
 async def save_or_update_stay_permit_data_async(data_list: List[dict]):
     if not data_list:
         return
 
-    # 1. Сначала сохраняем в БД (в отдельном потоке)
-    await asyncio.to_thread(save_or_update_stay_permit_data, SessionLocal(), data_list)
-
-    # 2. Потом отправляем уведомления только о новых (notified_as_new == False)
-    db = SessionLocal()
+    # 1. Сохраняем в БД (оборачиваем создание сессии внутрь функции или используем контекстный менеджер)
+    # Лучше создать обертку, которая сама создаст и закроет сессию
+    def _sync_wrapper(data):
+        with SessionLocal() as db:
+            save_or_update_stay_permit_data(db, data)
+    
     try:
-        for item in data_list:
-            reg_number = item.get("reg_number")
-            if not reg_number:
-                continue
+        await asyncio.to_thread(_sync_wrapper, data_list)
+    except Exception as e:
+        custom_logger.error(f"Критическая ошибка при сохранении в БД: {e}")
+        return  # Прерываем выполнение, если сохранение не удалось
 
-            permit = db.query(StayPermit).filter(StayPermit.reg_number == reg_number).first()
-            if not permit or getattr(permit, "notified_as_new", False):
-                continue
+    # 2. Отправка уведомлений (логика осталась прежней, но сессия в `with`)
+    try:
+        # Используем with для автоматического закрытия сессии
+        with SessionLocal() as db:
+            for item in data_list:
+                reg_number = item.get("reg_number")
+                if not reg_number:
+                    continue
 
-            file_path = f"src/temp/{reg_number}_stay_permit.pdf"
-            document = FSInputFile(file_path) if os.path.exists(file_path) else None
+                permit = db.query(StayPermit).filter(StayPermit.reg_number == reg_number).first()
+                
+                # Проверяем, что пермит существует и не был уведомлен
+                if not permit or getattr(permit, "notified_as_new", False):
+                    continue
 
-            text = (
-                f"Новый ITK добавлен в систему!\n\n"
-                f"ФИО: {item.get('name', '—')}\n"
-                f"Паспорт: {item.get('passport_number', '—')}\n"
-                f"Тип разрешения: {item.get('type_of_staypermit', '—')}\n"
-                f"Дата выдачи: {item.get('issue_date', '—')}\n"
-                f"Действует до: {item.get('expired_date', '—')}\n"
-                f"Рег. номер: {reg_number}\n"
-                f"Статус: {item.get('status', 'не указан')}"
-            )
+                file_path = f"src/temp/{reg_number}_stay_permit.pdf"
+                document = FSInputFile(file_path) if os.path.exists(file_path) else None
 
-            # Отправляем в фоне — не ждём!
-            asyncio.create_task(send_telegram_message(text, document=document))
+                text = (
+                    f"Новый ITK добавлен в систему!\n\n"
+                    f"ФИО: {item.get('name', '—')}\n"
+                    f"Паспорт: {item.get('passport_number', '—')}\n"
+                    f"Тип разрешения: {item.get('type_of_staypermit', '—')}\n"
+                    f"Дата выдачи: {item.get('issue_date', '—')}\n"
+                    f"Действует до: {item.get('expired_date', '—')}\n"
+                    f"Рег. номер: {reg_number}\n"
+                    f"Статус: {item.get('status', 'не указан')}"
+                )
 
-            # Помечаем как отправленное
-            permit.notified_as_new = True
+                # Отправляем в фоне
+                asyncio.create_task(send_telegram_message(text, document=document))
 
-        db.commit()
-        custom_logger.info(f"Уведомления о новых StayPermit отправлены: {len(data_list)} шт.")
+                # Помечаем как отправленное
+                permit.notified_as_new = True
+                
+                # Коммитим флаг уведомления сразу или пачками - здесь пачкой надежнее внутри цикла, 
+                # но можно и один раз в конце, если уверены в надежности
+            
+            db.commit()
+            # custom_logger.info(...) можно добавить тут
+
     except Exception as e:
         custom_logger.error(f"Ошибка при отправке уведомлений о новых ITK: {e}")
-        db.rollback()
-    finally:
-        db.close()
 
 
 
