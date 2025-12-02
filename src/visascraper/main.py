@@ -332,6 +332,7 @@ class DataParser:
         self.session_manager = session_manager
         self.pdf_manager = pdf_manager
         self.gs_manager = gs_manager  
+        self.main_loop = None  # <--- ДОБАВЛЯЕМ СЮДА ПЕРЕМЕННУЮ ДЛЯ ЦИКЛА
 
     def _parse_date_for_sorting(self, date_str: str) -> date:
         """Преобразует строку даты в datetime.date для сортировки."""
@@ -539,7 +540,7 @@ class DataParser:
                         break
 
                     items_in_batch = 0
-                    for item_data in result_data:
+                    for item_data in result_data[:20]:
                         try:
                             reg_number_raw = safe_get(item_data, 'register_number')
                             if not reg_number_raw:
@@ -596,12 +597,19 @@ class DataParser:
 
                 db_dicts = [obj.to_db_dict() for obj in parsed_data_list]
                 if db_dicts:
+                    # 1. Синхронное сохранение (как и было)
                     with SessionLocal() as db:
                         save_or_update_stay_permit_data(db, db_dicts)
 
-                    # ← ЭТО НОВОЕ — МГНОВЕННЫЕ УВЕДОМЛЕНИЯ, НЕ БЛОКИРУЯ ПАРСЕР
-                    loop = asyncio.get_event_loop()
-                    loop.create_task(save_or_update_stay_permit_data_async(db_dicts))
+                    # 2. Асинхронное уведомление (ИСПРАВЛЕНО)
+                    # Мы проверяем, передан ли main_loop, и отправляем задачу туда.
+                    if self.main_loop and self.main_loop.is_running():
+                        asyncio.run_coroutine_threadsafe(
+                            save_or_update_stay_permit_data_async(db_dicts),
+                            self.main_loop
+                        )
+                    else:
+                        custom_logger.error("Main loop not found or closed. Skipping async notifications.")
 
                 # Подготовка данных для Google Sheets
                 sheet_data = [obj.to_sheet_row() for obj in parsed_data_list]
@@ -831,6 +839,8 @@ class Application:
 
     async def run(self):
         init_db()
+        loop = asyncio.get_running_loop()
+        self.data_parser.main_loop = loop  
         
         # 1. Автозапуск первых двух аккаунтов — каждые 10 минут
         self.job_scheduler.start_scheduler()
