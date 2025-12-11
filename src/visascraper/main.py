@@ -414,7 +414,9 @@ class DataParser:
                             detail_link = f"https://evisa.imigrasi.go.id{extract_detail(safe_get(item_data, 'actions'))}"
                             date_birth = ''
                             try:
-                                detail_response = self.session_manager.get_session().get(detail_link)
+                                detail_response = self.session_manager.get_session().get(detail_link,
+                                                                                                                 headers=headers,
+                        cookies=cookies)
                                 detail_result = detail_response.text
                                 soup = BeautifulSoup(detail_result, 'html.parser')
                                 birth_label = soup.find(text='Date of Birth')  # Находим текст лейбла
@@ -540,7 +542,7 @@ class DataParser:
                         break
 
                     items_in_batch = 0
-                    for item_data in result_data:
+                    for item_data in result_data[:10]:
                         try:
                             reg_number_raw = safe_get(item_data, 'register_number')
                             if not reg_number_raw:
