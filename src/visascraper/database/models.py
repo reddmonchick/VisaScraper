@@ -26,6 +26,7 @@ class BatchApplication(Base):
     account = Column(String)
     birth_date = Column(String)
     last_status = Column(String, default=None)
+    notified_as_new = Column(Boolean, default=False)
 
 class StayPermit(Base):
     __tablename__ = "stay_permits"

@@ -23,7 +23,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from database.db import init_db, SessionLocal
-from database.crud import save_or_update_batch_data, save_or_update_stay_permit_data, save_or_update_stay_permit_data_async
+from database.crud import save_or_update_batch_data, save_or_update_stay_permit_data, save_or_update_stay_permit_data_async, notify_new_batch_applications
 from session_manager import login, check_session, load_session
 from utils.logger import logger as custom_logger
 from utils.parser import (
@@ -473,6 +473,16 @@ class DataParser:
                     save_or_update_batch_data(db, db_dicts)
                     custom_logger.info(f"✅ Данные Batch Application для {name} сохранены в БД (всего {len(db_dicts)} записей)")
 
+                # Асинхронное уведомление
+                if self.main_loop and self.main_loop.is_running():
+                    asyncio.run_coroutine_threadsafe(
+                        notify_new_batch_applications(db_dicts),
+                        self.main_loop
+                    )
+                else:
+                    custom_logger.error("Main loop not found or closed. Skipping BatchApplication notifications.")
+
+
                 # Подготовка данных для Google Sheets
                 client_data_table = [obj.to_client_table_row() for obj in parsed_data_list]
                 manager_data = [obj.to_manager_row() for obj in parsed_data_list]
@@ -803,25 +813,35 @@ class JobScheduler:
             if len(names) < 2:
                 custom_logger.warning("Недостаточно аккаунтов")
                 return
-            batch_app, batch_mgr, stay = self.data_parser.parse_accounts(names[:2][::-1], passwords[:2][::-1])
+            batch_app, batch_mgr, stay = self.data_parser.parse_accounts(names[1:2][::-1], passwords[1:2][::-1])
             self.gs_manager.write_to_sheet(batch_app, batch_mgr, stay)
             custom_logger.info("Задача 'первые два' выполнена")
         except Exception as e:
             custom_logger.error(f"[job_first_two] Ошибка: {e}\n{format_exc()}")
 
     def start_scheduler(self):
-        """Запускаем ТОЛЬКО первые два аккаунта по расписанию"""
+        self.scheduler.add_job(
+            self.job_first_two,
+            'date',
+            run_date=datetime.now(),
+            id='first_two_accounts_once',
+            replace_existing=True
+        )
+
         self.scheduler.add_job(
             self.job_first_two,
             'interval',
             minutes=BATCH_PARSE_INTERVAL_MINUTES,
-            next_run_time=datetime.now(),  # сразу при старте
-            id='first_two_accounts',
+            id='first_two_accounts_interval',
             replace_existing=True,
             misfire_grace_time=300
         )
+
         self.scheduler.start()
-        custom_logger.info(f"Автозапуск первых двух аккаунтов каждые {BATCH_PARSE_INTERVAL_MINUTES} мин — ВКЛЮЧЁН")
+        custom_logger.info(
+            f"Мгновенный запуск + каждые {BATCH_PARSE_INTERVAL_MINUTES} мин — ВКЛЮЧЁН"
+        )
+
 
 
 # === Основное приложение ===
@@ -841,7 +861,9 @@ class Application:
         self.job_scheduler.job_first_two()
 
     async def run(self):
-        init_db()
+        custom_logger.info("Запуск инициализации БД...") # Отладочный принт
+        init_db() 
+        custom_logger.info("БД готова.")
         loop = asyncio.get_running_loop()
         self.data_parser.main_loop = loop  
         

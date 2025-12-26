@@ -11,7 +11,47 @@ import asyncio
 from aiogram.types import FSInputFile
 import os
 from bot.notification import send_telegram_message 
+from aiogram.types import FSInputFile
 
+
+async def notify_new_batch_applications(data_list: list):
+    """Отправка уведомлений о новых BatchApplication."""
+    try:
+        with SessionLocal() as db:
+            for item in data_list:
+                reg_number = item.get("register_number")
+                if not reg_number:
+                    continue
+
+                app = db.query(BatchApplication).filter(BatchApplication.register_number == reg_number).first()
+
+                # Проверяем, что запись существует и уведомление ещё не отправлено
+                if not app or app.notified_as_new:
+                    continue
+
+                file_path = f"src/temp/{reg_number}_batch_application.pdf"
+                document = FSInputFile(file_path) if os.path.exists(file_path) else None
+
+                text = (
+                    f"Новое заявление Batch Application!\n\n"
+                    f"ФИО: {item.get('full_name', '—')}\n"
+                    f"Паспорт: {item.get('passport_number', '—')}\n"
+                    f"Рег. номер: {reg_number}\n"
+                    f"Дата подачи: {item.get('submission_date', '—')}\n"
+                    f"Статус: {item.get('status', 'не указан')}"
+                )
+
+                # Отправляем уведомление
+                asyncio.create_task(send_telegram_message(text, document=document))
+
+                # Помечаем как уведомленное
+                app.notified_as_new = True
+
+            db.commit()
+            custom_logger.info("✅ Уведомления по BatchApplication отправлены")
+
+    except Exception as e:
+        custom_logger.error(f"Ошибка при отправке уведомлений BatchApplication: {e}")
 
 
 def save_or_update_batch_data(db: Session, data_list: list):
@@ -139,7 +179,7 @@ async def save_or_update_stay_permit_data_async(data_list: List[dict]):
                 )
 
                 # Отправляем в фоне
-                asyncio.create_task(send_telegram_message(text, document=document))
+                #asyncio.create_task(send_telegram_message(text, document=document))
 
                 # Помечаем как отправленное
                 permit.notified_as_new = True
@@ -154,10 +194,6 @@ async def save_or_update_stay_permit_data_async(data_list: List[dict]):
         custom_logger.error(f"Ошибка при отправке уведомлений о новых ITK: {e}")
 
 
-
-def init_db(engine):
-    from .models import Base
-    Base.metadata.create_all(bind=engine)
 
 
 def clear_old_users_if_password_changed(db: Session, current_password: str):

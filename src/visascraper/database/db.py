@@ -26,4 +26,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
     """Создаёт таблицы при первом запуске"""
+    from .models import BatchApplication, StayPermit, User 
     Base.metadata.create_all(bind=engine)
+    print(f"База данных инициализирована по пути: {DB_PATH}") # Для отладки
