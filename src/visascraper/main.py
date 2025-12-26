@@ -813,7 +813,7 @@ class JobScheduler:
             if len(names) < 2:
                 custom_logger.warning("Недостаточно аккаунтов")
                 return
-            batch_app, batch_mgr, stay = self.data_parser.parse_accounts(names[1:2][::-1], passwords[1:2][::-1])
+            batch_app, batch_mgr, stay = self.data_parser.parse_accounts(names[:2][::-1], passwords[:2][::-1])
             self.gs_manager.write_to_sheet(batch_app, batch_mgr, stay)
             custom_logger.info("Задача 'первые два' выполнена")
         except Exception as e:
