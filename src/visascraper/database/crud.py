@@ -61,7 +61,10 @@ def save_or_update_batch_data(db: Session, data_list: list):
         if not reg_number:
             continue
 
-        existing_app = db.query(BatchApplication).filter(BatchApplication.register_number == reg_number).first()
+        existing_app = db.query(BatchApplication).filter(
+            BatchApplication.register_number == reg_number
+        ).first()
+
         if existing_app:
             new_status = item_data.get("status")
             if existing_app.status != new_status:
@@ -69,13 +72,19 @@ def save_or_update_batch_data(db: Session, data_list: list):
                 existing_app.status = new_status
 
             for key, value in item_data.items():
+                # исключаем служебные поля
+                if key in ("id", "notified_as_new", "last_status"):
+                    continue
                 if hasattr(existing_app, key):
                     setattr(existing_app, key, value)
         else:
             new_app = BatchApplication(**item_data)
             new_app.last_status = item_data.get("status")
+            # notified_as_new остаётся False по умолчанию
             db.add(new_app)
+
     db.commit()
+
 
 
 def save_or_update_stay_permit_data(db: Session, data_list: List[dict]):
@@ -89,49 +98,48 @@ def save_or_update_stay_permit_data(db: Session, data_list: List[dict]):
         return
 
     # 1. Убираем дубликаты внутри самого списка data_list.
-    # Используем словарь: если reg_number повторяется, останется последний (самый свежий).
     unique_data_map = {
-        item['reg_number']: item 
-        for item in data_list 
+        item['reg_number']: item
+        for item in data_list
         if item.get('reg_number')
     }
 
     if not unique_data_map:
         return
 
-    # 2. Получаем список всех reg_number, которые мы хотим обработать
+    # 2. Получаем список всех reg_number
     reg_numbers = list(unique_data_map.keys())
 
-    # 3. ОПТИМИЗАЦИЯ: Загружаем все существующие записи одним запросом
-    # вместо того, чтобы делать запрос в цикле для каждой записи.
+    # 3. Загружаем все существующие записи одним запросом
     existing_records = db.query(StayPermit).filter(StayPermit.reg_number.in_(reg_numbers)).all()
-    
-    # Создаем словарь существующих записей для быстрого поиска {reg_number: объект}
     existing_dict = {rec.reg_number: rec for rec in existing_records}
 
     for reg_number, data in unique_data_map.items():
         existing = existing_dict.get(reg_number)
 
         if existing:
-            # Обновляем существующую запись
+            # Обновляем только бизнес‑поля, исключая служебные
             for key, value in data.items():
+                if key in ("id", "notified_as_new", "last_status"):
+                    continue
                 if hasattr(existing, key):
                     setattr(existing, key, value)
             custom_logger.info(f"Обновлена запись Stay Permit: {reg_number}")
         else:
             # Создаем новую запись
             new_record = StayPermit(**data)
+            # notified_as_new остаётся False по умолчанию
+            new_record.last_status = data.get("status")
             db.add(new_record)
             custom_logger.info(f"Добавлена новая запись Stay Permit: {reg_number}")
 
-    # 4. Коммит с обработкой ошибок
     try:
         db.commit()
     except Exception as e:
         db.rollback()
         custom_logger.error(f"Ошибка при сохранении Stay Permits: {e}")
-        # Можно повторно выбросить ошибку, если нужно прервать выполнение
         # raise e
+
 
 async def save_or_update_stay_permit_data_async(data_list: List[dict]):
     if not data_list:
