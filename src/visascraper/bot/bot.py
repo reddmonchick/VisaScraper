@@ -1,14 +1,13 @@
+from __future__ import annotations
+
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
-from dotenv import load_dotenv
-import os
 
-load_dotenv()
+from visascraper.config import settings
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-if not TOKEN:
-    raise ValueError("❌ TELEGRAM_BOT_TOKEN не найден в .env")
+if not settings.telegram_bot_token:
+    raise ValueError("TELEGRAM_BOT_TOKEN не найден")
 
-bot = Bot(token=TOKEN)
+bot = Bot(token=settings.telegram_bot_token)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)

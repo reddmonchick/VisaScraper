@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import gspread
 
-def setup_google_sheet(credentials_path: dict, sheet_id: str) -> tuple:
+
+def setup_google_sheet(credentials_path: dict, sheet_id: str) -> tuple[gspread.Client, gspread.Spreadsheet]:
     gc = gspread.service_account_from_dict(credentials_path)
     spreadsheet = gc.open_by_key(sheet_id)
     return gc, spreadsheet
+
 
 def prepare_worksheet(spreadsheet, worksheet_name: str):
     try:

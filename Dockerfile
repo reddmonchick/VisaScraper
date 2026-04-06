@@ -1,19 +1,11 @@
-
 FROM python:3.12-slim
 
 WORKDIR /app
 
+COPY pyproject.toml poetry.lock ./
+RUN pip install --no-cache-dir poetry && poetry config virtualenvs.create false
+RUN poetry install --no-interaction --no-ansi
 
-COPY pyproject.toml .
-COPY poetry.lock .
-COPY .env .
+COPY . .
 
-RUN pip install --no-cache-dir poetry && \
-    poetry config virtualenvs.create false
-
-
-RUN poetry install --no-root --no-interaction --no-ansi
-
-COPY src/ src/
-
-CMD ["poetry", "run", "python", "src/visascraper/main.py"]
+CMD ["poetry", "run", "run"]

@@ -1,254 +1,237 @@
-from aiogram import Bot
+from __future__ import annotations
+
+import asyncio
+from dataclasses import dataclass
 from datetime import date, timedelta
-import os
-from database.db import SessionLocal
-from database.models import BatchApplication, StayPermit
-from utils.logger import logger as custom_logger
-from sqlalchemy import func
+from pathlib import Path
+
+from aiogram import Bot
 from aiogram.exceptions import TelegramRetryAfter
-from dotenv import load_dotenv
-import asyncio
 from aiogram.types import FSInputFile
-import queue
-import asyncio
-from aiogram.types import FSInputFile
-import os
 
-load_dotenv()
+from visascraper.config import settings
+from visascraper.database.db import SessionLocal
+from visascraper.database.models import BatchApplication, StayPermit
+from visascraper.utils.logger import logger
 
-
-# === Инициализация бота ===
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID")
-bot = Bot(token=BOT_TOKEN)
+DELAY_BETWEEN_MESSAGES = 1
 
 
-# === Асинхронная отправка сообщения ===
-DELAY_BETWEEN_MESSAGES = 1  # 1 секунда между сообщениями
+@dataclass(slots=True)
+class NotificationJob:
+    text: str
+    chat_id: str
+    document_path: Path | None = None
 
-# Глобальная очередь — безопасная для многопоточной записи
-notification_queue = queue.Queue()   # ←←← ВОТ ЭТА СТРОКА ИЗМЕНИЛАСЬ
 
-async def send_telegram_message(text: str, document: FSInputFile = None):
-    bot = Bot(token=os.getenv("TELEGRAM_BOT_TOKEN"))
-    try:
-        if document:
-            await bot.send_document(
-                    chat_id=os.getenv("TELEGRAM_CHANNEL_ID"),
-                    document=document,
-                    caption=text
-                )
-        else:
-            await bot.send_message(chat_id=os.getenv("TELEGRAM_CHANNEL_ID"), text=text)
-            print("✅ Сообщение отправлено в Telegram")
-            await asyncio.sleep(DELAY_BETWEEN_MESSAGES)  # Задержка после успешной отправки
-    except TelegramRetryAfter as e:
-        print(f"⚠️ Слишком много запросов. Ждём {e.retry_after} секунд...")
-        await asyncio.sleep(e.retry_after)
-        await send_telegram_message(text)  # Повторяем отправку после ожидания
-    except Exception as e:
-        print(f"❌ Ошибка при отправке сообщения: {e} {os.getenv("TELEGRAM_CHANNEL_ID")}")
-    finally:
-        await bot.session.close()
+class NotificationService:
+    def __init__(self) -> None:
+        self._queue: asyncio.Queue[NotificationJob | None] | None = None
+        self._worker_task: asyncio.Task[None] | None = None
+        self._bot: Bot | None = None
 
-# Обработчик очереди — запускается в основном event loop
-async def notification_worker():
-    custom_logger.info("notification_worker запущен и ждёт задачи...")
-    while True:
-        try:
-            # ←←← .get() блокирует, пока не придёт задача
-            item = notification_queue.get(timeout=1)
-        except queue.Empty:
-            continue
+    @property
+    def is_running(self) -> bool:
+        return self._worker_task is not None and not self._worker_task.done()
 
-        if item["type"] == "new_stay_permit":
-            data = item["data"]
-            reg_number = data.get("reg_number")
-            if not reg_number:
-                notification_queue.task_done()
-                continue
+    async def start(self) -> None:
+        if self.is_running:
+            return
+        if not settings.telegram_bot_token:
+            logger.warning("Сервис уведомлений не запущен: TELEGRAM_BOT_TOKEN не задан")
+            return
 
-            # Проверка, не отправляли ли уже
-            db = SessionLocal()
+        self._queue = asyncio.Queue()
+        self._bot = Bot(token=settings.telegram_bot_token)
+        self._worker_task = asyncio.create_task(self._worker(), name="notification-worker")
+        logger.info("Сервис уведомлений Telegram запущен")
+
+    async def stop(self) -> None:
+        if self._queue and self._worker_task:
+            await self._queue.put(None)
+            await self._worker_task
+
+        if self._bot:
+            await self._bot.session.close()
+
+        self._queue = None
+        self._worker_task = None
+        self._bot = None
+
+    async def enqueue(
+        self,
+        text: str,
+        document_path: Path | None = None,
+        chat_id: str | None = None,
+    ) -> None:
+        recipient = chat_id or settings.telegram_channel_id
+        if not recipient:
+            logger.warning("Уведомление пропущено: TELEGRAM_CHANNEL_ID не задан")
+            return
+
+        if not self.is_running:
+            await self.start()
+
+        if not self._queue:
+            logger.warning("Уведомление пропущено: сервис уведомлений не инициализирован")
+            return
+
+        await self._queue.put(
+            NotificationJob(
+                text=text,
+                chat_id=recipient,
+                document_path=document_path,
+            )
+        )
+
+    async def _worker(self) -> None:
+        if not self._queue or not self._bot:
+            return
+
+        while True:
+            job = await self._queue.get()
             try:
-                permit = db.query(StayPermit).filter(StayPermit.reg_number == reg_number).first()
-                if permit and getattr(permit, "notified_as_new", False):
-                    notification_queue.task_done()
-                    continue
+                if job is None:
+                    break
+                await self._deliver(job)
             finally:
-                db.close()
+                self._queue.task_done()
 
-            file_path = f"src/temp/{reg_number}_stay_permit.pdf"
-            document = FSInputFile(file_path) if os.path.exists(file_path) else None
+    async def _deliver(self, job: NotificationJob) -> None:
+        if not self._bot:
+            return
 
-            text = (
-                    "🗒️Новый ITK в системе!\n\n"
-                    f"ФИО: {data.get('name') or '—'}\n"
-                    f"Паспорт: {data.get('passport_number') or '—'}\n"
-                    f"Тип: {data.get('type_of_staypermit') or '—'}\n"
-                    f"Выдан: {data.get('issue_date') or '—'}\n"
-                    f"До: {data.get('expired_date') or '—'}\n"
-                    f"Рег.номер: {reg_number}"
-                )
-
-            await send_telegram_message(text, document=document)
-
-            # Помечаем как отправленное
-            db = SessionLocal()
+        while True:
             try:
-                permit = db.query(StayPermit).filter(StayPermit.reg_number == reg_number).first()
-                if permit:
-                    permit.notified_as_new = True
-                    db.commit()
-            except:
-                db.rollback()
-            finally:
-                db.close()
+                document = None
+                if job.document_path and job.document_path.exists():
+                    document = FSInputFile(job.document_path)
 
-        notification_queue.task_done()
+                if document:
+                    await self._bot.send_document(
+                        chat_id=job.chat_id,
+                        document=document,
+                        caption=job.text,
+                    )
+                else:
+                    await self._bot.send_message(chat_id=job.chat_id, text=job.text)
+
+                await asyncio.sleep(DELAY_BETWEEN_MESSAGES)
+                return
+            except TelegramRetryAfter as exc:
+                logger.warning("Telegram rate limit. Повтор через %s секунд", exc.retry_after)
+                await asyncio.sleep(exc.retry_after)
+            except Exception as exc:
+                logger.error("Ошибка отправки Telegram сообщения: %s", exc)
+                return
 
 
-# === 1. Уведомление о статусе "Approved" ===
-async def notify_approved_users():
-    db = SessionLocal()
-    print('Запустили крон: notify_approved_users')
-    try:
+notification_service = NotificationService()
+
+
+async def start_notification_service() -> None:
+    await notification_service.start()
+
+
+async def stop_notification_service() -> None:
+    await notification_service.stop()
+
+
+async def send_telegram_message(
+    text: str,
+    document_path: Path | None = None,
+    chat_id: str | None = None,
+) -> None:
+    await notification_service.enqueue(text=text, document_path=document_path, chat_id=chat_id)
+
+
+async def notify_approved_users() -> None:
+    outgoing_messages: list[tuple[str, Path | None]] = []
+    with SessionLocal() as db:
         users = db.query(BatchApplication).all()
         for user in users:
-            if user.status == "Approved" and user.last_status != "Approved" and user.last_status != None:
-
-                file_path = f"src/temp/{user.register_number}_batch_application.pdf"
-                document = FSInputFile(file_path)
-
+            if user.status == "Approved" and user.last_status not in {"Approved", None}:
+                file_path = settings.temp_dir / f"{user.register_number}_batch_application.pdf"
                 text = (
-                    f"🎉 Виза одобрена!\n"
+                    "Виза одобрена!\n"
                     f"Имя: {user.full_name}\n"
                     f"Статус: {user.status}\n"
-                    f"Номер паспорта: {user.passport_number}\n"
-                  #  f"Ссылка: {user.action_link}"
+                    f"Номер паспорта: {user.passport_number}"
                 )
-                await send_telegram_message(text, document=document)
+                #outgoing_messages.append((text, file_path if file_path.exists() else None))
                 user.last_status = "Approved"
-                db.commit()
             elif user.status != "Approved" and user.last_status == "Approved":
                 user.last_status = user.status
-                db.commit()
-    except Exception as e:
-        print(f"❌ Ошибка: {e}")
-        db.rollback()
-    finally:
-        db.close()
+        db.commit()
 
-async def notify_approved_stay_permits():
-    db = SessionLocal()
-    print('Запустили крон: notify_approved_stay_permits')
-    try:
-        # Запрашиваем все разрешения на пребывание (StayPermit)
+    for text, document_path in outgoing_messages:
+        await send_telegram_message(text, document_path=document_path)
+
+
+async def notify_approved_stay_permits() -> None:
+    outgoing_messages: list[tuple[str, Path | None]] = []
+    with SessionLocal() as db:
         permits = db.query(StayPermit).all()
         for permit in permits:
-            # Основное условие: статус стал "Approved", а предыдущий статус был другим (или не был установлен)
             if permit.status == "Approved" and permit.last_status != "Approved":
-                
-                # Формируем путь к локальному PDF файлу
-                file_path = f"src/temp/{permit.reg_number}_stay_permit.pdf"
-                document = FSInputFile(file_path)
-
-                # Формируем текст уведомления
+                file_path = settings.temp_dir / f"{permit.reg_number}_stay_permit.pdf"
                 text = (
-                    f"🎉 ITK (Stay Permit) одобрен!\n"
+                    "ITK (Stay Permit) одобрен!\n"
                     f"Имя: {permit.name}\n"
                     f"Статус: {permit.status}\n"
                     f"Номер паспорта: {permit.passport_number}\n"
                     f"Тип разрешения: {permit.type_of_staypermit}"
                 )
-                
-                # Отправляем сообщение с документом
-                await send_telegram_message(text, document=document)
-                
-                # Обновляем last_status, чтобы не отправлять повторно
+                #outgoing_messages.append((text, file_path if file_path.exists() else None))
                 permit.last_status = "Approved"
-                db.commit()
-
-            # Условие сброса: если статус изменился с "Approved" на любой другой
             elif permit.status != "Approved" and permit.last_status == "Approved":
                 permit.last_status = permit.status
-                db.commit()
+        db.commit()
 
-    except Exception as e:
-        print(f"❌ Ошибка в notify_approved_stay_permits: {e}")
-        db.rollback()
-    finally:
-        db.close()
+    for text, document_path in outgoing_messages:
+        await send_telegram_message(text, document_path=document_path)
 
 
-# === 2. Проверка дней рождения ===
-async def check_birthdays():
-    db = SessionLocal()
+async def check_birthdays() -> None:
     today = date.today()
-    print('Запустили крон: check_birthdays')
-    try:
+    outgoing_messages: list[str] = []
+    with SessionLocal() as db:
         users = db.query(BatchApplication).filter(
             BatchApplication.birth_date.is_not(None),
-            BatchApplication.birth_date.like(f"{today.strftime('%d/%m')}/%")
+            BatchApplication.birth_date.like(f"{today.strftime('%d/%m')}/%"),
         ).all()
-
         for user in users:
-            text = (
-                f"🎂 Сегодня день рождения у {user.full_name}!\n"
-                f"Тип визы: {user.visa_type}\n"
-                f"Дата рождения: {user.birth_date}"
+            outgoing_messages.append(
+                (
+                    f"Сегодня день рождения у {user.full_name}!\n"
+                    f"Тип визы: {user.visa_type}\n"
+                    f"Дата рождения: {user.birth_date}"
+                )
             )
-            await send_telegram_message(text)
-    except Exception as e:
-        print(f"❌ Ошибка при проверке дней рождения: {e}")
-    finally:
-        db.close()
+
+    for text in outgoing_messages:
+        await send_telegram_message(text)
 
 
-# === 3. Проверка истечения срока действия визы ===
-async def check_visa_expirations():
-    db = SessionLocal()
+async def check_visa_expirations() -> None:
     today = date.today()
-    target_date = (today + timedelta(days=40)).strftime("%Y-%m-%d")
-    two_target_date = (today + timedelta(days=5)).strftime("%Y-%m-%d")
+    windows = [40, 5]
+    outgoing_messages: list[tuple[str, Path | None]] = []
+    with SessionLocal() as db:
+        for days_before in windows:
+            target_date = (today + timedelta(days=days_before)).strftime("%Y-%m-%d")
+            users = db.query(StayPermit).filter(
+                StayPermit.expired_date.is_not(None),
+                StayPermit.expired_date == target_date,
+            ).all()
+            for user in users:
+                file_path = settings.temp_dir / f"{user.reg_number}_stay_permit.pdf"
+                text = (
+                    f"ВНИМАНИЕ: у пользователя с паспортом {user.passport_number} виза заканчивается через {days_before} дней!\n"
+                    f"Дата окончания: {user.expired_date}\n"
+                    f"Тип визы: {user.type_of_staypermit}"
+                )
+                outgoing_messages.append((text, file_path if file_path.exists() else None))
 
-    print('Запустили крон: check_visa_expirations')
-
-    try:
-        users = db.query(StayPermit).filter(
-            StayPermit.expired_date.is_not(None),
-            StayPermit.expired_date == target_date
-        ).all()
-
-        for user in users:
-            file_path = f"src/temp/{user.reg_number}_stay_permit.pdf"
-            document = FSInputFile(file_path)
-
-            text = (
-                f"⚠️ ВНИМАНИЕ: У пользователя c номером паспорта {user.passport_number} виза заканчивается через 40 дней!\n"
-                f"Дата окончания: {user.expired_date}\n"
-                f"Тип визы: {user.type_of_staypermit}\n"
-               # f"Ссылка: {user.action_link}"
-            )
-            await send_telegram_message(text, document)
-
-        users = db.query(StayPermit).filter(
-            StayPermit.expired_date.is_not(None),
-            StayPermit.expired_date == two_target_date
-        ).all()
-
-        for user in users:
-            file_path = f"src/temp/{user.reg_number}_stay_permit.pdf"
-            document = FSInputFile(file_path)
-
-            text = (
-                f"⚠️ ВНИМАНИЕ: У пользователя c номером паспорта {user.passport_number} виза заканчивается через 5 дней!\n"
-                f"Дата окончания: {user.expired_date}\n"
-                f"Тип визы: {user.type_of_staypermit}\n"
-               # f"Ссылка: {user.action_link}"
-            )
-            await send_telegram_message(text, document=document)
-    except Exception as e:
-        print(f"❌ Ошибка при проверке истечения визы: {e}")
-    finally:
-        db.close()
+    for text, document_path in outgoing_messages:
+        await send_telegram_message(text, document_path=document_path)

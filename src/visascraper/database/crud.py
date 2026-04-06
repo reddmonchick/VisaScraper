@@ -1,22 +1,29 @@
+from __future__ import annotations
 
-from database.db import init_db, SessionLocal
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import or_
-from utils.logger import logger as custom_logger
-from .models import User, BatchApplication, StayPermit
-from typing import Optional, List
 import re
-import asyncio
-from aiogram.types import FSInputFile
-import os
-from bot.notification import send_telegram_message 
-from aiogram.types import FSInputFile
+from pathlib import Path
+
+from sqlalchemy import or_
+from sqlalchemy.orm import Session
+
+from visascraper.bot.notification import send_telegram_message
+from visascraper.config import settings
+from visascraper.database.db import SessionLocal
+from visascraper.database.models import BatchApplication, StayPermit, User
+from visascraper.utils.logger import logger
 
 
-async def notify_new_batch_applications(data_list: list):
-    """Отправка уведомлений о новых BatchApplication."""
+def _batch_pdf_path(register_number: str) -> Path:
+    return settings.temp_dir / f"{register_number}_batch_application.pdf"
+
+
+def _stay_pdf_path(reg_number: str) -> Path:
+    return settings.temp_dir / f"{reg_number}_stay_permit.pdf"
+
+
+async def notify_new_batch_applications(data_list: list[dict]) -> None:
     try:
+        outgoing_messages: list[tuple[str, Path | None]] = []
         with SessionLocal() as db:
             for item in data_list:
                 reg_number = item.get("register_number")
@@ -24,142 +31,94 @@ async def notify_new_batch_applications(data_list: list):
                     continue
 
                 app = db.query(BatchApplication).filter(BatchApplication.register_number == reg_number).first()
-
-                # Проверяем, что запись существует и уведомление ещё не отправлено
                 if not app or app.notified_as_new:
                     continue
 
-                file_path = f"src/temp/{reg_number}_batch_application.pdf"
-                document = FSInputFile(file_path) if os.path.exists(file_path) else None
-
                 text = (
-                    f"Новое заявление Batch Application!\n\n"
+                    "Новое заявление Batch Application!\n\n"
                     f"ФИО: {item.get('full_name', '—')}\n"
                     f"Паспорт: {item.get('passport_number', '—')}\n"
                     f"Рег. номер: {reg_number}\n"
-                    f"Дата подачи: {item.get('submission_date', '—')}\n"
                     f"Статус: {item.get('status', 'не указан')}"
                 )
-
-                # Отправляем уведомление
-                asyncio.create_task(send_telegram_message(text, document=document))
-
-                # Помечаем как уведомленное
+                file_path = _batch_pdf_path(reg_number)
+                outgoing_messages.append((text, file_path if file_path.exists() else None))
                 app.notified_as_new = True
 
             db.commit()
-            custom_logger.info("✅ Уведомления по BatchApplication отправлены")
+            logger.info("Уведомления по новым Batch Application подготовлены: %s", len(outgoing_messages))
 
-    except Exception as e:
-        custom_logger.error(f"Ошибка при отправке уведомлений BatchApplication: {e}")
+        for text, document_path in outgoing_messages:
+            await send_telegram_message(text, document_path=document_path)
+    except Exception as exc:
+        logger.error("Ошибка отправки уведомлений Batch Application: %s", exc)
 
 
-def save_or_update_batch_data(db: Session, data_list: list):
-    """Сохраняет новые заявления BatchApplication или обновляет существующие."""
-    for item_data in data_list:
-        reg_number = item_data.get("register_number")
-        if not reg_number:
-            continue
+def save_or_update_batch_data(db: Session, data_list: list[dict]) -> None:
+    if not data_list:
+        return
 
-        existing_app = db.query(BatchApplication).filter(
-            BatchApplication.register_number == reg_number
-        ).first()
+    unique_map = {item["register_number"]: item for item in data_list if item.get("register_number")}
+    existing_records = db.query(BatchApplication).filter(BatchApplication.register_number.in_(unique_map.keys())).all()
+    existing_map = {item.register_number: item for item in existing_records}
 
-        if existing_app:
-            new_status = item_data.get("status")
-            if existing_app.status != new_status:
-                existing_app.last_status = existing_app.status
-                existing_app.status = new_status
-
-            for key, value in item_data.items():
-                # исключаем служебные поля
-                if key in ("id", "notified_as_new", "last_status"):
+    for reg_number, payload in unique_map.items():
+        existing = existing_map.get(reg_number)
+        if existing:
+            new_status = payload.get("status")
+            if existing.status != new_status:
+                existing.last_status = existing.status
+                existing.status = new_status
+            for key, value in payload.items():
+                if key in {"id", "notified_as_new", "last_status"}:
                     continue
-                if hasattr(existing_app, key):
-                    setattr(existing_app, key, value)
+                if hasattr(existing, key):
+                    setattr(existing, key, value)
         else:
-            new_app = BatchApplication(**item_data)
-            new_app.last_status = item_data.get("status")
-            # notified_as_new остаётся False по умолчанию
-            db.add(new_app)
+            record = BatchApplication(**payload)
+            record.last_status = payload.get("status")
+            db.add(record)
 
     db.commit()
 
 
-
-def save_or_update_stay_permit_data(db: Session, data_list: List[dict]):
-    """
-    Исправленный upsert:
-    1. Убирает дубликаты из входящего списка.
-    2. Загружает существующие записи пачкой (оптимизация).
-    3. Обновляет или вставляет без конфликтов.
-    """
+def save_or_update_stay_permit_data(db: Session, data_list: list[dict]) -> None:
     if not data_list:
         return
 
-    # 1. Убираем дубликаты внутри самого списка data_list.
-    unique_data_map = {
-        item['reg_number']: item
-        for item in data_list
-        if item.get('reg_number')
-    }
-
-    if not unique_data_map:
+    unique_map = {item["reg_number"]: item for item in data_list if item.get("reg_number")}
+    if not unique_map:
         return
 
-    # 2. Получаем список всех reg_number
-    reg_numbers = list(unique_data_map.keys())
+    existing_records = db.query(StayPermit).filter(StayPermit.reg_number.in_(unique_map.keys())).all()
+    existing_map = {record.reg_number: record for record in existing_records}
 
-    # 3. Загружаем все существующие записи одним запросом
-    existing_records = db.query(StayPermit).filter(StayPermit.reg_number.in_(reg_numbers)).all()
-    existing_dict = {rec.reg_number: rec for rec in existing_records}
-
-    for reg_number, data in unique_data_map.items():
-        existing = existing_dict.get(reg_number)
-
+    for reg_number, payload in unique_map.items():
+        existing = existing_map.get(reg_number)
         if existing:
-            # Обновляем только бизнес‑поля, исключая служебные
-            for key, value in data.items():
-                if key in ("id", "notified_as_new", "last_status"):
+            new_status = payload.get("status")
+            if existing.status != new_status:
+                existing.last_status = existing.status
+                existing.status = new_status
+            for key, value in payload.items():
+                if key in {"id", "notified_as_new", "last_status"}:
                     continue
                 if hasattr(existing, key):
                     setattr(existing, key, value)
-            custom_logger.info(f"Обновлена запись Stay Permit: {reg_number}")
         else:
-            # Создаем новую запись
-            new_record = StayPermit(**data)
-            # notified_as_new остаётся False по умолчанию
-            new_record.last_status = data.get("status")
-            db.add(new_record)
-            custom_logger.info(f"Добавлена новая запись Stay Permit: {reg_number}")
+            record = StayPermit(**payload)
+            record.last_status = payload.get("status")
+            db.add(record)
 
-    try:
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        custom_logger.error(f"Ошибка при сохранении Stay Permits: {e}")
-        # raise e
+    db.commit()
 
 
-async def save_or_update_stay_permit_data_async(data_list: List[dict]):
+async def save_or_update_stay_permit_data_async(data_list: list[dict]) -> None:
     if not data_list:
         return
 
-    # 1. Сохраняем в БД (оборачиваем создание сессии внутрь функции или используем контекстный менеджер)
-    # Лучше создать обертку, которая сама создаст и закроет сессию
-    def _sync_wrapper(data):
-        with SessionLocal() as db:
-            save_or_update_stay_permit_data(db, data)
-    
     try:
-        await asyncio.to_thread(_sync_wrapper, data_list)
-    except Exception as e:
-        custom_logger.error(f"Критическая ошибка при сохранении в БД: {e}")
-        return  # Прерываем выполнение, если сохранение не удалось
-
-    # 2. Отправка уведомлений (логика осталась прежней, но сессия в `with`)
-    try:
-        # Используем with для автоматического закрытия сессии
+        outgoing_messages: list[tuple[str, Path | None]] = []
         with SessionLocal() as db:
             for item in data_list:
                 reg_number = item.get("reg_number")
@@ -167,16 +126,11 @@ async def save_or_update_stay_permit_data_async(data_list: List[dict]):
                     continue
 
                 permit = db.query(StayPermit).filter(StayPermit.reg_number == reg_number).first()
-                
-                # Проверяем, что пермит существует и не был уведомлен
-                if not permit or getattr(permit, "notified_as_new", False):
+                if not permit or permit.notified_as_new:
                     continue
 
-                file_path = f"src/temp/{reg_number}_stay_permit.pdf"
-                document = FSInputFile(file_path) if os.path.exists(file_path) else None
-
                 text = (
-                    f"Новый ITK добавлен в систему!\n\n"
+                    "Новый ITK добавлен в систему!\n\n"
                     f"ФИО: {item.get('name', '—')}\n"
                     f"Паспорт: {item.get('passport_number', '—')}\n"
                     f"Тип разрешения: {item.get('type_of_staypermit', '—')}\n"
@@ -185,89 +139,52 @@ async def save_or_update_stay_permit_data_async(data_list: List[dict]):
                     f"Рег. номер: {reg_number}\n"
                     f"Статус: {item.get('status', 'не указан')}"
                 )
-
-                # Отправляем в фоне
-                #asyncio.create_task(send_telegram_message(text, document=document))
-
-                # Помечаем как отправленное
+                file_path = _stay_pdf_path(reg_number)
+                outgoing_messages.append((text, file_path if file_path.exists() else None))
                 permit.notified_as_new = True
-                
-                # Коммитим флаг уведомления сразу или пачками - здесь пачкой надежнее внутри цикла, 
-                # но можно и один раз в конце, если уверены в надежности
-            
+
             db.commit()
-            # custom_logger.info(...) можно добавить тут
 
-    except Exception as e:
-        custom_logger.error(f"Ошибка при отправке уведомлений о новых ITK: {e}")
-
-
-
-
-def clear_old_users_if_password_changed(db: Session, current_password: str):
-    users = db.query(User).all()
-    for user in users:
-        if user.password != current_password:
-            db.delete(user)
-    db.commit()
+        for text, document_path in outgoing_messages:
+            await send_telegram_message(text, document_path=document_path)
+    except Exception as exc:
+        logger.error("Ошибка отправки уведомлений о новых ITK: %s", exc)
 
 
 def get_user_by_telegram_id(db: Session, telegram_id: str):
     return db.query(User).filter(User.telegram_id == telegram_id).first()
 
 
-def create_user(db: Session, telegram_id: str, account_name: str, password: str):
-    existing = db.query(User).filter(User.telegram_id == telegram_id).first()
-    if existing:
-        existing.account_name = account_name
-        existing.password = password
-        db.commit()
-        return existing
-    new_user = User(telegram_id=telegram_id, account_name=account_name, password=password)
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    return new_user
-
-
-def delete_user(db: Session):
-    db.query(User).delete()
-    db.commit()
-
-
 def search_by_passport(db: Session, search_input: str):
-    search_input = search_input.strip()
-    custom_logger.info(f"Входной запрос для поиска по паспорту: '{search_input}'")
-    passport_match = re.search(r'\b(?=\w*\d)[A-Z0-9-]{5,}\b', search_input)
+    search_input = search_input.strip().upper()
+    passport_match = re.search(r"\b(?=\w*\d)[A-Z0-9-]{5,}\b", search_input)
     passport_number = passport_match.group(0) if passport_match else None
-    custom_logger.info(f"Извлеченный номер паспорта: '{passport_number}'")
-
-    if passport_number:
-        name_part = re.sub(r'\b' + re.escape(passport_number) + r'\b\s*', '', search_input).strip()
-    else:
-        name_part = search_input
-
-    name_parts = list(set(filter(None, re.split(r'\s+', name_part.upper()))))
-    custom_logger.info(f"Части имени: {name_parts}")
+    name_query = re.sub(rf"\b{re.escape(passport_number)}\b\s*", "", search_input).strip() if passport_number else search_input
+    name_parts = list(dict.fromkeys(filter(None, re.split(r"\s+", name_query))))
 
     query = db.query(BatchApplication)
-    if name_parts and passport_number:
-        name_filters = [BatchApplication.full_name.ilike(f"%{part}%") for part in name_parts]
-        query = query.filter(or_(*name_filters))
-        query = query.filter(or_(
-            BatchApplication.passport_number == passport_number,
-            BatchApplication.passport_number.ilike(f"%{passport_number}%")
-        ))
+    if passport_number:
+        query = query.filter(
+            or_(
+                BatchApplication.passport_number == passport_number,
+                BatchApplication.passport_number.ilike(f"%{passport_number}%"),
+            )
+        )
+    if name_parts:
+        query = query.filter(or_(*[BatchApplication.full_name.ilike(f"%{part}%") for part in name_parts]))
+
+    if not passport_number and not name_parts:
+        return []
+
     results = query.all()
-    custom_logger.info(f"Найдено записей BatchApplication: {len(results)}")
+    logger.info("Найдено записей BatchApplication: %s", len(results))
     return results
 
 
 def search_by_stay_permit(db: Session, passport_number_input: str):
     passport_number = passport_number_input.strip().upper()
-    custom_logger.info(f"Поиск StayPermit по паспорту: '{passport_number}'")
     if not passport_number:
         return []
     results = db.query(StayPermit).filter(StayPermit.passport_number == passport_number).all()
-    custom_logger.info(f"Найдено StayPermit: {len(results)}")
+    logger.info("Найдено StayPermit: %s", len(results))
     return results
