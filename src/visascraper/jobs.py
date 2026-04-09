@@ -5,6 +5,7 @@ from collections.abc import Callable
 from contextlib import suppress
 from datetime import datetime
 import time
+from zoneinfo import ZoneInfo
 
 from gspread.exceptions import APIError
 
@@ -319,10 +320,11 @@ class JobScheduler:
         self._run_accounts(accounts[::-1], "secondary_accounts", progress_callback=progress_callback)
 
     def start_scheduler(self) -> None:
+        current_time = datetime.now(ZoneInfo(settings.app_timezone))
         self.scheduler.add_job(
             self.job_first_two,
             "date",
-            run_date=datetime.now(),
+            run_date=current_time,
             id="priority_accounts_initial",
             replace_existing=True,
         )
