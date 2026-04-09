@@ -158,7 +158,7 @@ async def notify_approved_users() -> None:
                     f"Статус: {user.status}\n"
                     f"Номер паспорта: {user.passport_number}"
                 )
-                #outgoing_messages.append((text, file_path if file_path.exists() else None))
+                outgoing_messages.append((text, file_path if file_path.exists() else None))
                 user.last_status = "Approved"
             elif user.status != "Approved" and user.last_status == "Approved":
                 user.last_status = user.status
@@ -182,7 +182,7 @@ async def notify_approved_stay_permits() -> None:
                     f"Номер паспорта: {permit.passport_number}\n"
                     f"Тип разрешения: {permit.type_of_staypermit}"
                 )
-                #outgoing_messages.append((text, file_path if file_path.exists() else None))
+                outgoing_messages.append((text, file_path if file_path.exists() else None))
                 permit.last_status = "Approved"
             elif permit.status != "Approved" and permit.last_status == "Approved":
                 permit.last_status = permit.status
