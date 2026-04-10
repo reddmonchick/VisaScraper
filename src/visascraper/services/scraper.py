@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import date, datetime
 from collections.abc import Callable
+from datetime import date, datetime
 from typing import Optional
 
 from bs4 import BeautifulSoup
@@ -75,7 +75,11 @@ class DataParser:
             logger.error("Ошибка при парсинге даты рождения из %s: %s", detail_link, exc)
             return ""
 
-    def _store_batch_items(self, account_name: str, parsed_items: list[BatchApplicationData]) -> tuple[list[list[str]], list[list[str]]]:
+    def _store_batch_items(
+        self,
+        account_name: str,
+        parsed_items: list[BatchApplicationData],
+    ) -> tuple[list[list[str]], list[list[str]]]:
         payload = [item.to_db_dict() for item in parsed_items]
         with SessionLocal() as db:
             save_or_update_batch_data(db, payload)
@@ -214,9 +218,11 @@ class DataParser:
         session_id: str,
     ) -> list[list[str]]:
         logger.info("Начинаем парсинг Stay Permit для аккаунта %s", account_name)
+        collected_items: dict[str, StayPermitData] = {}
+        next_offset = 0
+
         for attempt in range(1, 4):
-            parsed_items: list[StayPermitData] = []
-            offset = 0
+            offset = next_offset
             try:
                 while True:
                     cookies = {"PHPSESSID": session_id}
@@ -282,7 +288,7 @@ class DataParser:
                                 pdf_relative_url=pdf_relative_url,
                                 reg_number=stay_item.reg_number,
                             )
-                            parsed_items.append(stay_item)
+                            collected_items[stay_item.reg_number] = stay_item
                         except Exception as exc:
                             logger.error("Ошибка обработки Stay Permit элемента для %s: %s", account_name, exc)
 
@@ -293,7 +299,9 @@ class DataParser:
                         len(result_data),
                     )
                     offset += len(result_data)
-                return self._store_stay_items(account_name, parsed_items)
+                    next_offset = offset
+
+                return self._store_stay_items(account_name, list(collected_items.values()))
             except Exception as exc:
                 logger.error(
                     "Ошибка в fetch_and_update_stay для %s, попытка %s/3: %s",
@@ -302,6 +310,13 @@ class DataParser:
                     exc,
                 )
                 if attempt == 3:
+                    if collected_items:
+                        logger.warning(
+                            "Сохраняем частично собранные Stay Permit для %s после ошибки: %s записей",
+                            account_name,
+                            len(collected_items),
+                        )
+                        return self._store_stay_items(account_name, list(collected_items.values()))
                     return []
                 time.sleep(10)
         return []

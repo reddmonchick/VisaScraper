@@ -323,19 +323,14 @@ class JobScheduler:
         current_time = datetime.now(ZoneInfo(settings.app_timezone))
         self.scheduler.add_job(
             self.job_first_two,
-            "date",
-            run_date=current_time,
-            id="priority_accounts_initial",
-            replace_existing=True,
-        )
-        self.scheduler.add_job(
-            self.job_first_two,
             "interval",
             minutes=settings.batch_parse_interval_minutes,
             id="priority_accounts_interval",
             replace_existing=True,
+            next_run_time=current_time,
             misfire_grace_time=300,
             max_instances=1,
+            coalesce=True,
         )
         self.scheduler.start()
         logger.info(
