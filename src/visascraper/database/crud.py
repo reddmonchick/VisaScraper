@@ -42,7 +42,7 @@ async def notify_new_batch_applications(data_list: list[dict]) -> None:
                     f"Статус: {item.get('status', 'не указан')}"
                 )
                 file_path = _batch_pdf_path(reg_number)
-                #outgoing_messages.append((text, file_path if file_path.exists() else None))
+                outgoing_messages.append((text, file_path if file_path.exists() else None))
                 app.notified_as_new = True
 
             db.commit()
@@ -140,7 +140,7 @@ async def save_or_update_stay_permit_data_async(data_list: list[dict]) -> None:
                     f"Статус: {item.get('status', 'не указан')}"
                 )
                 file_path = _stay_pdf_path(reg_number)
-                #outgoing_messages.append((text, file_path if file_path.exists() else None))
+                outgoing_messages.append((text, file_path if file_path.exists() else None))
                 permit.notified_as_new = True
 
             db.commit()
